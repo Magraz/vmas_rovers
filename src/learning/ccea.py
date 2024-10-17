@@ -94,10 +94,10 @@ class CooperativeCoevolutionaryAlgorithm:
         # Experiment data
         self.trial_name = Path(self.config_dir).stem
 
-        # Set map size
+        # Environment data
         self.map_size = self.config["env"]["map_size"]
+        self.n_steps = self.config["ccea"]["n_steps"]
 
-        # Start by setting up variables for different agents
         self.n_agents = len(self.config["env"]["rovers"])
         self.lidar_rays = [
             rover["lidar"]["rays"] for rover in self.config["env"]["rovers"]
@@ -105,6 +105,18 @@ class CooperativeCoevolutionaryAlgorithm:
         self.lidar_range = [
             rover["lidar"]["range"] for rover in self.config["env"]["rovers"]
         ]
+
+        self.n_pois = len(self.config["env"]["pois"])
+        self.poi_positions = [
+            poi["position"]["fixed"] for poi in self.config["env"]["pois"]
+        ]
+        self.coupling = [poi["coupling"] for poi in self.config["env"]["pois"]]
+        self.values = [poi["value"] for poi in self.config["env"]["pois"]]
+        self.obs_radius = [
+            poi["observation_radius"] for poi in self.config["env"]["pois"]
+        ]
+
+        # Learning data
         self.use_teaming = self.config["teaming"]["use_teaming"]
         self.use_fc = self.config["fitness_critic"]["use_fit_crit"]
         self.fit_crit_loss_type = self.config["fitness_critic"]["loss_type"]
@@ -132,13 +144,6 @@ class CooperativeCoevolutionaryAlgorithm:
         self.fit_crit_type = self.config["fitness_critic"]["type"]
         self.fit_crit_n_hidden = self.config["fitness_critic"]["hidden_layers"]
 
-        self.n_pois = len(self.config["env"]["pois"])
-        self.coupling = [poi["coupling"] for poi in self.config["env"]["pois"]]
-        self.values = [poi["value"] for poi in self.config["env"]["pois"]]
-        self.obs_radius = [
-            poi["observation_radius"] for poi in self.config["env"]["pois"]
-        ]
-
         self.n_elites = round(
             self.config["ccea"]["selection"]["n_elites"] * self.subpop_size
         )
@@ -146,7 +151,6 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
 
-        self.n_steps = self.config["ccea"]["n_steps"]
         self.n_gens = self.config["ccea"]["n_gens"]
 
         self.nn_template = self.generateTemplateNN()
@@ -500,6 +504,7 @@ class CooperativeCoevolutionaryAlgorithm:
             # Environment specific variables
             n_agents=self.n_agents,
             n_targets=self.n_pois,
+            targets_positions=self.poi_positions,
             x_semidim=self.map_size[0],
             y_semidim=self.map_size[1],
             agents_per_target=self.coupling[0],
@@ -507,7 +512,6 @@ class CooperativeCoevolutionaryAlgorithm:
             n_lidar_rays_entities=self.lidar_rays[0],
             n_lidar_rays_agents=self.lidar_rays[0],
             lidar_range=self.lidar_range[0],
-            env_count=n_envs,
         )
         return env
 

@@ -8,11 +8,9 @@ from learning.ccea import CooperativeCoevolutionaryAlgorithm
 experiment_type = "standard"
 poi_type = "static"
 model = "mlp"
-trial = 1
+trial = 0
 experiment_name = "_".join((experiment_type, poi_type, model))
-checkpoint_path = (
-    "./src/experiments/results/standard_static_mlp/trial_1_static_mlp/checkpoint.pickle"
-)
+checkpoint_path = f"./src/experiments/results/{experiment_name}/trial_{trial}_{poi_type}_{model}/checkpoint.pickle"
 config_path = "./src/experiments/yamls/standard/static_mlp.yaml"
 
 best_team = None

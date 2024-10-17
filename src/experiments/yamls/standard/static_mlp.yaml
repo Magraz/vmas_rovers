@@ -24,7 +24,7 @@ env:
       coupling: 2
       position:
         spawn_rule: fixed
-        fixed: [10.0, 20.0]
+        fixed: [-0.5, -0.5]
     
     - type: static
       value: 2.0
@@ -32,7 +32,7 @@ env:
       coupling: 2
       position:
         spawn_rule: fixed
-        fixed: [25.0, 10.0]
+        fixed: [-0.5, 0.5]
     
     - type: static
       value: 2.0
@@ -40,7 +40,7 @@ env:
       coupling: 2
       position:
         spawn_rule: fixed
-        fixed: [25.0, 10.0]
+        fixed: [0.5, 0.5]
 
     - type: static
       value: 4.0
@@ -48,7 +48,7 @@ env:
       coupling: 2
       position:
         spawn_rule: fixed
-        fixed: [40.0, 20.0]
+        fixed: [0.5, -0.5]
 
   map_size: [1.0, 1.0]
 
@@ -86,7 +86,7 @@ ccea:
     mean: 1.0
     std_deviation: 0.05
 
-  n_steps: 200
+  n_steps: 30
   n_gens: 5000
 
 processing:

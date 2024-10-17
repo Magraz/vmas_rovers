@@ -23,28 +23,29 @@ if typing.TYPE_CHECKING:
 class RoverDomain(BaseScenario):
     def make_world(self, batch_dim: int, device: torch.device, **kwargs):
 
-        self._env_count = kwargs.pop("env_count", 0)
+        self.x_semidim = kwargs.pop("x_semidim", 1)
+        self.y_semidim = kwargs.pop("y_semidim", 1)
 
         self.n_agents = kwargs.pop("n_agents", 5)
         self.n_targets = kwargs.pop("n_targets", 7)
-        self.x_semidim = kwargs.pop("x_semidim", 1)
-        self.y_semidim = kwargs.pop("y_semidim", 1)
+        self.targets_positions = kwargs.pop("targets_positions", 7)
 
         self._min_dist_between_entities = kwargs.pop("min_dist_between_entities", 0.2)
         self._lidar_range = kwargs.pop("lidar_range", 0.35)
         self._covering_range = kwargs.pop("covering_range", 0.25)
 
-        self.use_agent_lidar = kwargs.pop("use_agent_lidar", True)
         self.n_lidar_rays_entities = kwargs.pop("n_lidar_rays_entities", 16)
         self.n_lidar_rays_agents = kwargs.pop("n_lidar_rays_agents", 16)
 
         self._agents_per_target = kwargs.pop("agents_per_target", 2)
         self.targets_respawn = kwargs.pop("targets_respawn", False)
+        self.random_spawn = kwargs.pop("random_spawn", False)
         self.shared_reward = kwargs.pop("shared_reward", True)
 
         self.agent_collision_penalty = kwargs.pop("agent_collision_penalty", 0)
         self.covering_rew_coeff = kwargs.pop("covering_rew_coeff", 1.0)
         self.time_penalty = kwargs.pop("time_penalty", 0)
+
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
         self._comms_range = self._lidar_range
@@ -90,19 +91,15 @@ class RoverDomain(BaseScenario):
                             render_color=Color.GREEN,
                         )
                     ]
-                    + (
-                        [
-                            Lidar(
-                                world,
-                                n_rays=self.n_lidar_rays_agents,
-                                max_range=self._lidar_range,
-                                entity_filter=entity_filter_agents,
-                                render_color=Color.BLUE,
-                            )
-                        ]
-                        if self.use_agent_lidar
-                        else []
-                    )
+                    + [
+                        Lidar(
+                            world,
+                            n_rays=self.n_lidar_rays_agents,
+                            max_range=self._lidar_range,
+                            entity_filter=entity_filter_agents,
+                            render_color=Color.BLUE,
+                        )
+                    ]
                 ),
             )
             agent.covering_reward = torch.zeros(batch_dim, device=device)
@@ -127,6 +124,7 @@ class RoverDomain(BaseScenario):
 
     def reset_world_at(self, env_index: int = None):
         placable_entities = self._targets[: self.n_targets] + self.world.agents
+
         if env_index is None:
             self.all_time_covered_targets = torch.full(
                 (self.world.batch_dim, self.n_targets),
@@ -135,16 +133,37 @@ class RoverDomain(BaseScenario):
             )
         else:
             self.all_time_covered_targets[env_index] = False
-        ScenarioUtils.spawn_entities_randomly(
-            entities=placable_entities,
-            world=self.world,
-            env_index=env_index,
-            min_dist_between_entities=self._min_dist_between_entities,
-            x_bounds=(-self.world.x_semidim, self.world.x_semidim),
-            y_bounds=(-self.world.y_semidim, self.world.y_semidim),
-        )
-        for target in self._targets[self.n_targets :]:
-            target.set_pos(self.get_outside_pos(env_index), batch_index=env_index)
+
+        if self.random_spawn:
+            ScenarioUtils.spawn_entities_randomly(
+                entities=placable_entities,
+                world=self.world,
+                env_index=env_index,
+                min_dist_between_entities=self._min_dist_between_entities,
+                x_bounds=(-self.world.x_semidim, self.world.x_semidim),
+                y_bounds=(-self.world.y_semidim, self.world.y_semidim),
+            )
+
+            for target in self._targets[self.n_targets :]:
+                target.set_pos(self.get_outside_pos(env_index), batch_index=env_index)
+        else:
+            for agent in self.world.agents:
+                agent.set_pos(
+                    torch.tensor(
+                        [0.0, 0.0],
+                        device=self.world.device,
+                    ),
+                    batch_index=env_index,
+                )
+
+            for idx, target in enumerate(self._targets):
+                pos = torch.ones(
+                    (self.world.batch_dim, self.world.dim_p), device=self.world.device
+                ) * torch.tensor(self.targets_positions[idx], device=self.world.device)
+                target.set_pos(
+                    pos,
+                    batch_index=env_index,
+                )
 
     def reward(self, agent: Agent):
         is_first = agent == self.world.agents[0]
