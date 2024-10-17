@@ -217,7 +217,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             case "MLP":
                 agent_nn = MLP_Policy(
-                    input_size=12,
+                    input_size=8,
                     hidden_layers=len(self.policy_n_hidden),
                     hidden_size=self.policy_n_hidden[0],
                     output_size=2,

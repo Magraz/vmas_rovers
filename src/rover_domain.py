@@ -232,33 +232,24 @@ class RoverDomain(BaseScenario):
         return agent.covering_reward
 
     def observation(self, agent: Agent):
+
         lidar_measures = torch.cat(
             (agent.sensors[0].measure(), agent.sensors[1].measure()), dim=-1
         ).unsqueeze(0)
 
-        resolution = self.n_lidar_rays_agents // 4
+        sectors = 4
+        resolution = self.n_lidar_rays_agents // sectors
 
-        F.max_pool1d()
-
-        dense_lidar_measures = F.conv1d(
-            input=lidar_measures,
-            weight=torch.ones((self._env_count, self._env_count, resolution)).to(
-                self.device
-            ),
-            stride=resolution,
+        # Minpool lidar measures to get a dense lidar measure per sector
+        dense_lidar_measures = -F.max_pool1d(
+            -lidar_measures, kernel_size=resolution, stride=resolution
         ).squeeze(0)
 
-        return torch.cat(
-            (agent.state.pos, agent.state.vel, dense_lidar_measures),
-            dim=-1,
+        dense_lidar_measures = F.tanh(
+            torch.abs(dense_lidar_measures - self._lidar_range)
         )
 
-        # lidar_1_measures = agent.sensors[0].measure()
-        # return torch.cat(
-        #     [agent.state.pos, agent.state.vel, lidar_1_measures]
-        #     + ([agent.sensors[1].measure()] if self.use_agent_lidar else []),
-        #     dim=-1,
-        # )
+        return dense_lidar_measures
 
     def info(self, agent: Agent) -> Dict[str, Tensor]:
         info = {

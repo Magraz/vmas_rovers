@@ -4,7 +4,7 @@ env:
     - observation_radius: 0.25
       lidar:
         range: 1.5
-        rays: 32
+        rays: 80
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
@@ -12,7 +12,7 @@ env:
     - observation_radius: 0.25
       lidar:
         range: 1.5
-        rays: 32
+        rays: 80
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
@@ -86,7 +86,7 @@ ccea:
     mean: 1.0
     std_deviation: 0.05
 
-  n_steps: 300
+  n_steps: 200
   n_gens: 5000
 
 processing:
