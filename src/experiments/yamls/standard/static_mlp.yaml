@@ -1,0 +1,97 @@
+env:
+
+  rovers:
+    - observation_radius: 0.25
+      lidar:
+        range: 1.5
+        rays: 32
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+    - observation_radius: 0.25
+      lidar:
+        range: 1.5
+        rays: 32
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+  pois:
+    - type: static
+      value: 4.0
+      observation_radius: 0.25
+      coupling: 2
+      position:
+        spawn_rule: fixed
+        fixed: [10.0, 20.0]
+    
+    - type: static
+      value: 2.0
+      observation_radius: 0.25
+      coupling: 2
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 10.0]
+    
+    - type: static
+      value: 2.0
+      observation_radius: 0.25
+      coupling: 2
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 10.0]
+
+    - type: static
+      value: 4.0
+      observation_radius: 0.25
+      coupling: 2
+      position:
+        spawn_rule: fixed
+        fixed: [40.0, 20.0]
+
+  map_size: [1.0, 1.0]
+
+teaming:
+  use_teaming: False
+  team_size: 0
+
+fitness_critic:
+    use_fit_crit: False
+    epochs: 1
+    type: MLP #MLP/ATTENTION
+    loss_type: MSE+MAE #MSE/MAE/MSE+MAE
+    hidden_layers: [80,80]
+
+ccea:
+
+  weight_initialization: kaiming
+
+  policy:
+    type: MLP
+    hidden_layers: [64]
+    rover_max_velocity: 1.0
+
+  population:
+    subpopulation_size: 50
+
+  evaluation:
+    n_evaluations: 1
+    fitness_method: aggregate #aggregate/last_step
+
+  selection:
+    n_elites: 0.10                       #Percentage of elites from subpopulation
+
+  mutation:
+    mean: 1.0
+    std_deviation: 0.05
+
+  n_steps: 300
+  n_gens: 5000
+
+processing:
+  use_multiprocessing: True
+  n_threads: 4
+
+data:
+  n_gens_between_save: 10
