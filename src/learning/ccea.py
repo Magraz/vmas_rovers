@@ -27,6 +27,7 @@ import pickle
 import csv
 
 from itertools import combinations
+from operator import attrgetter
 
 # Create and configure logger
 logging.basicConfig(format="%(asctime)s %(message)s")
@@ -149,7 +150,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.n_elites = round(
             self.config["ccea"]["selection"]["n_elites"] * self.subpop_size
         )
-        self.n_mutants = self.subpop_size - self.n_elites
+        self.n_mutants = self.subpop_size // 2
 
         self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
 
@@ -385,21 +386,31 @@ class CooperativeCoevolutionaryAlgorithm:
         # Don't mutate the elites
         for n_individual in range(self.n_mutants):
 
-            mutant_idx = n_individual + self.n_elites
+            mutant_idx = n_individual + self.n_mutants
 
             for subpop in population:
                 self.mutateIndividual(subpop[mutant_idx])
                 subpop[mutant_idx].fitness.values = (np.float32(0.0),)
 
-    def selectSubPopulation(self, subpopulation):
-        # Get the best N individuals
-        elites = tools.selBest(subpopulation, self.n_elites)
+    def binarySelection(self, individuals, tournsize:int, fit_attr:str="fitness"):
 
-        non_elites = tools.selTournament(
-            subpopulation, len(subpopulation) - self.n_elites, tournsize=2
+        # Shuffle the list randomly
+        random.shuffle(individuals)
+
+        # Create list of random pairs without repetition
+        pairs_of_candidates = [(individuals[i], individuals[i+1]) for i in range(0, len(individuals) - 1, tournsize)]
+
+        chosen_ones = [max(candidates, key=attrgetter(fit_attr)) for candidates in pairs_of_candidates]
+
+        return chosen_ones
+
+
+    def selectSubPopulation(self, subpopulation):
+        chosen_ones = self.binarySelection(
+            subpopulation, tournsize=2
         )
 
-        offspring = elites + non_elites
+        offspring = chosen_ones + chosen_ones
 
         # Return a deepcopy so that modifying an individual that was selected does not modify every single individual
         # that came from the same selected individual
@@ -442,8 +453,7 @@ class CooperativeCoevolutionaryAlgorithm:
     ):
         for eval_info in eval_infos:
             for individual in eval_info.team.individuals:
-                if individual.parameters.fitness.values[0] <= eval_info.team_fitness:
-                    individual.parameters.fitness.values = (eval_info.team_fitness,)
+                individual.parameters.fitness.values = (eval_info.team_fitness,)
 
     def setPopulation(self, population, offspring):
         for subpop, subpop_offspring in zip(population, offspring):
