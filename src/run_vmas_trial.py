@@ -9,7 +9,7 @@ import torch
 from vmas import make_env
 from vmas.simulator.utils import save_video
 from vmas.simulator.scenario import BaseScenario
-from rover_domain import RoverDomain, HeuristicPolicy
+from domain.rover_domain import RoverDomain, HeuristicPolicy
 
 
 def use_vmas_env(

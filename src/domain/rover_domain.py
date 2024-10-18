@@ -217,6 +217,7 @@ class RoverDomain(BaseScenario):
                     target.state.pos[self.covered_targets[:, i]] = self.get_outside_pos(
                         None
                     )[self.covered_targets[:, i]]
+
         covering_rew = (
             agent.covering_reward
             if not self.shared_reward
@@ -242,9 +243,13 @@ class RoverDomain(BaseScenario):
         targets_covered_by_agent = (
             self.agents_targets_dists[:, agent_index] < self._covering_range
         )
+
+        # dists_to_covered_targets = (targets_covered_by_agent * self.agents_targets_dists[:, agent_index])
+
         num_covered_targets_covered_by_agent = (
             targets_covered_by_agent * self.covered_targets
         ).sum(dim=-1)
+
         agent.covering_reward += (
             num_covered_targets_covered_by_agent * self.covering_rew_coeff
         )

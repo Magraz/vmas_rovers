@@ -80,14 +80,14 @@ ccea:
     fitness_method: aggregate #aggregate/last_step
 
   selection:
-    n_elites: 0.10                       #Percentage of elites from subpopulation
+    n_elites: 0.05                       #Percentage of elites from subpopulation
 
   mutation:
     mean: 1.0
     std_deviation: 0.05
 
   n_steps: 30
-  n_gens: 5000
+  n_gens: 3000
 
 processing:
   use_multiprocessing: True

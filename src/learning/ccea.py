@@ -9,7 +9,7 @@ import random
 from vmas import make_env
 from vmas.simulator.environment import Environment
 
-from rover_domain import RoverDomain
+from domain.rover_domain import RoverDomain
 
 from policies.mlp import MLP_Policy
 from policies.gru import GRU_Policy
@@ -98,6 +98,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.map_size = self.config["env"]["map_size"]
         self.n_steps = self.config["ccea"]["n_steps"]
 
+        #Agent data
         self.n_agents = len(self.config["env"]["rovers"])
         self.lidar_rays = [
             rover["lidar"]["rays"] for rover in self.config["env"]["rovers"]
@@ -106,6 +107,7 @@ class CooperativeCoevolutionaryAlgorithm:
             rover["lidar"]["range"] for rover in self.config["env"]["rovers"]
         ]
 
+        #POIs data
         self.n_pois = len(self.config["env"]["pois"])
         self.poi_positions = [
             poi["position"]["fixed"] for poi in self.config["env"]["pois"]
