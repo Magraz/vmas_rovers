@@ -32,7 +32,7 @@ if __name__ == "__main__":
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
     if args["hpc"]:
-        dir_path = "/nfs/hpc/share/agrazvam"
+        dir_path = "/nfs/stak/users/agrazvam/hpc-share/vmas_rovers/src"
 
     config_dir = os.path.join(dir_path, "experiments", "yamls", args["experiment_type"])
 
