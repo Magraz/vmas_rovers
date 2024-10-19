@@ -168,6 +168,7 @@ class RoverDomain(BaseScenario):
         is_last = agent == self.world.agents[-1]
 
         if is_first:
+            # Calculate G
             self.agents_pos = torch.stack(
                 [a.state.pos for a in self.world.agents], dim=1
             )
@@ -180,40 +181,22 @@ class RoverDomain(BaseScenario):
             self.covered_targets = self.agents_per_target >= self._agents_per_target
 
             self.shared_covering_rew[:] = 0
+
             for a in self.world.agents:
                 self.shared_covering_rew += self.agent_reward(a)
 
-        if is_last:
-            if self.targets_respawn:
-                occupied_positions_agents = [self.agents_pos]
-                for i, target in enumerate(self._targets):
-                    occupied_positions_targets = [
-                        o.state.pos.unsqueeze(1)
-                        for o in self._targets
-                        if o is not target
-                    ]
-                    occupied_positions = torch.cat(
-                        occupied_positions_agents + occupied_positions_targets,
-                        dim=1,
-                    )
-                    pos = ScenarioUtils.find_random_pos_for_entity(
-                        occupied_positions,
-                        env_index=None,
-                        world=self.world,
-                        min_dist_between_entities=self._min_dist_between_entities,
-                        x_bounds=(-self.world.x_semidim, self.world.x_semidim),
-                        y_bounds=(-self.world.y_semidim, self.world.y_semidim),
-                    )
+            # Calculate D
+            for me in self.world.agents:
+                agents_pos_without_me = torch.stack(
+                    [a.state.pos for agent in self.world.agents if agent != me], dim=1
+                )
 
-                    target.state.pos[self.covered_targets[:, i]] = pos[
-                        self.covered_targets[:, i]
-                    ].squeeze(1)
-            else:
-                self.all_time_covered_targets += self.covered_targets
-                for i, target in enumerate(self._targets):
-                    target.state.pos[self.covered_targets[:, i]] = self.get_outside_pos(
-                        None
-                    )[self.covered_targets[:, i]]
+        if is_last:
+            self.all_time_covered_targets += self.covered_targets
+            for i, target in enumerate(self._targets):
+                target.state.pos[self.covered_targets[:, i]] = self.get_outside_pos(
+                    None
+                )[self.covered_targets[:, i]]
 
         covering_rew = (
             agent.covering_reward
