@@ -42,9 +42,7 @@ class RoverDomain(BaseScenario):
         self.random_spawn = kwargs.pop("random_spawn", False)
         self.shared_reward = kwargs.pop("shared_reward", True)
 
-        self.agent_collision_penalty = kwargs.pop("agent_collision_penalty", 0)
         self.covering_rew_coeff = kwargs.pop("covering_rew_coeff", 1.0)
-        self.time_penalty = kwargs.pop("time_penalty", 0)
 
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
@@ -184,7 +182,6 @@ class RoverDomain(BaseScenario):
             self.shared_covering_rew[:] = 0
             for a in self.world.agents:
                 self.shared_covering_rew += self.agent_reward(a)
-            self.shared_covering_rew[self.shared_covering_rew != 0] /= 2
 
         if is_last:
             if self.targets_respawn:
