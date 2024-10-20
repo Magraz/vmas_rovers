@@ -231,7 +231,9 @@ class RoverDomain(BaseScenario):
                     None
                 )[self.covered_targets[:, i]]
 
-        covering_rew = agent.difference_rew if not self.use_G else self.global_rew
+        # covering_rew = agent.difference_rew if not self.use_G else self.global_rew
+
+        covering_rew = torch.cat([self.global_rew, agent.difference_rew])
 
         return covering_rew
 

@@ -49,7 +49,8 @@ def use_vmas_env(
     step = 0
 
     policy = HeuristicPolicy(continuous_action=True, device=device)
-    G = torch.zeros((n_agents, n_envs)).to(device)
+    G_total = torch.zeros((n_agents, n_envs)).to(device)
+    D_total = torch.zeros((n_agents, n_envs)).to(device)
 
     for step in range(n_steps):
         step += 1
@@ -67,12 +68,23 @@ def use_vmas_env(
             actions.append(action)
 
         obs, rews, dones, info = env.step(actions)
+        temp = [g[:n_envs] for g in rews]
+
+        G_total += torch.stack([g[:n_envs] for g in rews], dim=0)
+        D_total += torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
+
+        G = torch.stack([g[:n_envs] for g in rews], dim=0)
+        D = torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
 
         if any(tensor.any() for tensor in rews):
-            print(rews)
-            print(info)
-
-        G += torch.stack(rews, dim=0)
+            print("G")
+            print(G)
+            print("D")
+            print(D)
+            print("Total G")
+            print(G_total)
+            print("Total D")
+            print(D_total)
 
         if render:
             frame = env.render(
@@ -125,7 +137,7 @@ if __name__ == "__main__":
     config_dir = os.path.join(config_dir, yaml_filename)
 
     n_agents = 3
-    n_envs = 2
+    n_envs = 5
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     use_vmas_env(
