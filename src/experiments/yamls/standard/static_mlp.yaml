@@ -23,7 +23,7 @@ env:
         rays: 80
       position:
         spawn_rule: fixed
-        fixed: [0.1, 0.1]
+        fixed: [0.1, -0.1]
 
   pois:
     - type: static

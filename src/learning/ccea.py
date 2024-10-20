@@ -64,8 +64,8 @@ class EvalInfo(object):
         self,
         team: Team,
         team_fitness: float,
+        agent_fitnesses: list[float],
         joint_traj: list,
-        agent_fitnesses: list[float] = None,
     ):
         self.team = team
         self.agent_fitnesses = agent_fitnesses
@@ -280,6 +280,7 @@ class CooperativeCoevolutionaryAlgorithm:
             )
 
         G_list = []
+        D_list = []
 
         # Start evaluation
         for _ in range(self.n_steps):
@@ -315,7 +316,11 @@ class CooperativeCoevolutionaryAlgorithm:
                     (j_states, agent_positions[:, i, :]), dim=0
                 )
 
-            G_list.append(torch.stack(rewards, dim=0)[0])
+            G_list.append(torch.stack([g[: len(teams)] for g in rewards], dim=0)[0])
+
+            D_list.append(
+                torch.stack([d[len(teams) : len(teams) * 2] for d in rewards], dim=0)
+            )
 
             if render:
                 frame = env.render(
@@ -328,13 +333,17 @@ class CooperativeCoevolutionaryAlgorithm:
         match (self.fitness_method):
 
             case "aggregate":
-                team_fitness_per_env = torch.sum(torch.stack(G_list), dim=0).tolist()
+                g_per_env = torch.sum(torch.stack(G_list), dim=0).tolist()
+                d_per_env = torch.transpose(
+                    torch.sum(torch.stack(D_list), dim=0), dim0=0, dim1=1
+                ).tolist()
 
         # Generate evaluation infos
         eval_infos = [
             EvalInfo(
                 team=team,
-                team_fitness=team_fitness_per_env[i],
+                team_fitness=g_per_env[i],
+                agent_fitnesses=d_per_env[i],
                 joint_traj=JointTrajectory(
                     joint_states_per_env[i],
                 ),
@@ -424,9 +433,15 @@ class CooperativeCoevolutionaryAlgorithm:
         fitness_critics,
         eval_infos: list[EvalInfo],
     ):
+        # Assign D
         for eval_info in eval_infos:
-            for individual in eval_info.team.individuals:
-                individual.parameters.fitness.values = (eval_info.team_fitness,)
+            for individual, combo_idx in zip(
+                eval_info.team.individuals,
+                eval_info.team.combination,
+            ):
+                individual.parameters.fitness.values = (
+                    eval_info.agent_fitnesses[combo_idx],
+                )
 
     def setPopulation(self, population, offspring):
         for subpop, subpop_offspring in zip(population, offspring):

@@ -51,6 +51,8 @@ def use_vmas_env(
     policy = HeuristicPolicy(continuous_action=True, device=device)
     G_total = torch.zeros((n_agents, n_envs)).to(device)
     D_total = torch.zeros((n_agents, n_envs)).to(device)
+    G_list = []
+    D_list = []
 
     for step in range(n_steps):
         step += 1
@@ -70,6 +72,9 @@ def use_vmas_env(
         obs, rews, dones, info = env.step(actions)
         temp = [g[:n_envs] for g in rews]
 
+        G_list.append(torch.stack([g[:n_envs] for g in rews], dim=0)[0])
+        D_list.append(torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0))
+
         G_total += torch.stack([g[:n_envs] for g in rews], dim=0)
         D_total += torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
 
@@ -77,10 +82,11 @@ def use_vmas_env(
         D = torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
 
         if any(tensor.any() for tensor in rews):
-            print("G")
-            print(G)
-            print("D")
-            print(D)
+            # print("G")
+            # print(G)
+            # print("D")
+            # print(D)
+
             print("Total G")
             print(G_total)
             print("Total D")
@@ -94,6 +100,18 @@ def use_vmas_env(
             )
             if save_render:
                 frame_list.append(frame)
+
+    print("G List Agg")
+    G_agg = torch.sum(torch.stack(G_list), dim=0)
+    print(G_agg)
+    print("D List Agg")
+    D_agg = torch.sum(torch.stack(D_list), dim=0)
+    print(torch.transpose(D_agg, dim0=0, dim1=1))
+
+    # print("G List")
+    # print(G_list)
+    # print("D List")
+    # print(D_list)
 
     total_time = time.time() - init_time
 
