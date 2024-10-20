@@ -1,12 +1,9 @@
 from learning.ccea import runCCEA
-import torch.multiprocessing as mp
 import os
 
 import argparse
 
 if __name__ == "__main__":
-    # Set for CUDA to allow multiprocessing
-    mp.set_start_method("forkserver")
 
     # Arg parser variables
     parser = argparse.ArgumentParser()

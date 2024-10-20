@@ -3,19 +3,16 @@ from deap import creator
 from deap import tools
 import torch
 
-import torch.multiprocessing as mp
 import random
 
-from vmas import make_env
 from vmas.simulator.environment import Environment
-
-from domain.rover_domain import RoverDomain
 
 from policies.mlp import MLP_Policy
 from policies.gru import GRU_Policy
 from policies.cnn import CNN_Policy
 
 from fitness_critic.fitness_critic import FitnessCritic
+from domain.create_env import create_env
 
 from copy import deepcopy
 import numpy as np
@@ -37,8 +34,6 @@ logger = logging.getLogger()
 
 # Setting the threshold of logger to DEBUG
 logger.setLevel(logging.INFO)
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class Agent(object):
@@ -99,44 +94,26 @@ class CooperativeCoevolutionaryAlgorithm:
         self.map_size = self.config["env"]["map_size"]
         self.n_steps = self.config["ccea"]["n_steps"]
 
-        #Agent data
+        # Agent data
         self.n_agents = len(self.config["env"]["rovers"])
-        self.lidar_rays = [
-            rover["lidar"]["rays"] for rover in self.config["env"]["rovers"]
-        ]
-        self.lidar_range = [
-            rover["lidar"]["range"] for rover in self.config["env"]["rovers"]
-        ]
 
-        #POIs data
+        # POIs data
         self.n_pois = len(self.config["env"]["pois"])
-        self.poi_positions = [
-            poi["position"]["fixed"] for poi in self.config["env"]["pois"]
-        ]
-        self.coupling = [poi["coupling"] for poi in self.config["env"]["pois"]]
-        self.values = [poi["value"] for poi in self.config["env"]["pois"]]
-        self.obs_radius = [
-            poi["observation_radius"] for poi in self.config["env"]["pois"]
-        ]
 
         # Learning data
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.use_teaming = self.config["teaming"]["use_teaming"]
         self.use_fc = self.config["fitness_critic"]["use_fit_crit"]
         self.fit_crit_loss_type = self.config["fitness_critic"]["loss_type"]
 
         self.n_eval_per_team = self.config["ccea"]["evaluation"]["n_evaluations"]
+
         self.team_size = (
             self.config["teaming"]["team_size"] if self.use_teaming else self.n_agents
         )
         self.team_combinations = [
             combo for combo in combinations(range(self.n_agents), self.team_size)
         ]
-
-        self.n_eval_per_team_set = (
-            len(self.team_combinations) * self.n_eval_per_team
-            if self.use_teaming
-            else self.n_eval_per_team
-        )
 
         self.subpop_size = self.config["ccea"]["population"]["subpopulation_size"]
 
@@ -158,9 +135,6 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.nn_template = self.generateTemplateNN()
         self.rover_nn_size = self.nn_template.num_params
-
-        self.use_multiprocessing = self.config["processing"]["use_multiprocessing"]
-        self.n_threads = self.config["processing"]["n_threads"]
 
         # Data loading
         self.load_checkpoint = load_checkpoint
@@ -191,14 +165,6 @@ class CooperativeCoevolutionaryAlgorithm:
             n=self.n_agents,
         )
 
-        # Set up multi processing methods
-        if self.use_multiprocessing:
-            self.pool = mp.Pool(processes=self.n_threads)
-            self.map = self.pool.map_async
-        else:
-            self.toolbox.register("map", map)
-            self.map = map
-
     def createIndividual(self):
         match (self.weight_initialization):
             case "kaiming":
@@ -215,12 +181,12 @@ class CooperativeCoevolutionaryAlgorithm:
                     hidden_size=self.policy_n_hidden[0],
                     output_size=2,
                     n_layers=1,
-                ).to(DEVICE)
+                ).to(self.device)
 
             case "CNN":
                 agent_nn = CNN_Policy(
                     img_size=self.image_size,
-                ).to(DEVICE)
+                ).to(self.device)
 
             case "MLP":
                 agent_nn = MLP_Policy(
@@ -228,7 +194,7 @@ class CooperativeCoevolutionaryAlgorithm:
                     hidden_layers=len(self.policy_n_hidden),
                     hidden_size=self.policy_n_hidden[0],
                     output_size=2,
-                ).to(DEVICE)
+                ).to(self.device)
 
         return agent_nn
 
@@ -247,7 +213,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Create evaluation teams
         eval_teams = self.formTeams(population, for_evaluation=True)
         # Create one env
-        env = self.create_env(1)
+        env = create_env(self.config_dir, n_envs=1, device=self.device)
 
         return self.evaluateTeams(env, eval_teams)
 
@@ -297,14 +263,16 @@ class CooperativeCoevolutionaryAlgorithm:
         # Load in the weights
         for i, team in enumerate(teams):
             for agent_nn, individual in zip(joint_policies[i], team.individuals):
-                agent_nn.set_params(torch.from_numpy(individual.parameters).to(DEVICE))
+                agent_nn.set_params(
+                    torch.from_numpy(individual.parameters).to(self.device)
+                )
 
         # Get initial observations per agent
         observations = env.reset()
 
         # Store joint states per environment for the first state
         agent_positions = torch.stack([agent.state.pos for agent in env.agents], dim=0)
-        joint_states_per_env = [torch.empty((0, 2)).to(DEVICE) for _ in teams]
+        joint_states_per_env = [torch.empty((0, 2)).to(self.device) for _ in teams]
 
         for i, j_states in enumerate(joint_states_per_env):
             joint_states_per_env[i] = torch.cat(
@@ -318,7 +286,9 @@ class CooperativeCoevolutionaryAlgorithm:
 
             stacked_obs = torch.stack(observations, -1)
 
-            actions = [torch.empty((0, 2)).to(DEVICE) for _ in range(self.n_agents)]
+            actions = [
+                torch.empty((0, 2)).to(self.device) for _ in range(self.n_agents)
+            ]
 
             for observation, joint_policy in zip(stacked_obs, joint_policies):
 
@@ -392,23 +362,26 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.mutateIndividual(subpop[mutant_idx])
                 subpop[mutant_idx].fitness.values = (np.float32(0.0),)
 
-    def binarySelection(self, individuals, tournsize:int, fit_attr:str="fitness"):
+    def binarySelection(self, individuals, tournsize: int, fit_attr: str = "fitness"):
 
         # Shuffle the list randomly
         random.shuffle(individuals)
 
         # Create list of random pairs without repetition
-        pairs_of_candidates = [(individuals[i], individuals[i+1]) for i in range(0, len(individuals) - 1, tournsize)]
+        pairs_of_candidates = [
+            (individuals[i], individuals[i + 1])
+            for i in range(0, len(individuals) - 1, tournsize)
+        ]
 
-        chosen_ones = [max(candidates, key=attrgetter(fit_attr)) for candidates in pairs_of_candidates]
+        chosen_ones = [
+            max(candidates, key=attrgetter(fit_attr))
+            for candidates in pairs_of_candidates
+        ]
 
         return chosen_ones
 
-
     def selectSubPopulation(self, subpopulation):
-        chosen_ones = self.binarySelection(
-            subpopulation, tournsize=2
-        )
+        chosen_ones = self.binarySelection(subpopulation, tournsize=2)
 
         offspring = chosen_ones + chosen_ones
 
@@ -473,7 +446,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Now save it all to the csv
         with open(eval_fit_dir, "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            for eval_info in eval_infos:
+            for _ in eval_infos:
                 writer.writerow([self.gen, *team_fitnesses])
 
     def init_fitness_critics(self):
@@ -494,7 +467,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             fc = [
                 FitnessCritic(
-                    device=DEVICE,
+                    device=self.device,
                     model_type=self.fit_crit_type,
                     loss_fn=loss_fn,
                     episode_size=self.n_steps,
@@ -505,27 +478,6 @@ class CooperativeCoevolutionaryAlgorithm:
             ]
 
         return fc
-
-    def create_env(self, n_envs: int) -> Environment:
-        # Set up the enviornment
-        env = make_env(
-            scenario=RoverDomain(),
-            num_envs=n_envs,
-            device=DEVICE,
-            seed=None,
-            # Environment specific variables
-            n_agents=self.n_agents,
-            n_targets=self.n_pois,
-            targets_positions=self.poi_positions,
-            x_semidim=self.map_size[0],
-            y_semidim=self.map_size[1],
-            agents_per_target=self.coupling[0],
-            covering_range=self.obs_radius[0],
-            n_lidar_rays_entities=self.lidar_rays[0],
-            n_lidar_rays_agents=self.lidar_rays[0],
-            lidar_range=self.lidar_range[0],
-        )
-        return env
 
     def run(self):
 
@@ -587,7 +539,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 fitness_critics = None
 
         # Create environment
-        env = self.create_env(self.subpop_size)
+        env = create_env(self.config_dir, n_envs=self.subpop_size, device=self.device)
 
         for n_gen in range(self.n_gens + 1):
 
@@ -650,9 +602,6 @@ class CooperativeCoevolutionaryAlgorithm:
                         handle,
                         protocol=pickle.HIGHEST_PROTOCOL,
                     )
-
-        if self.use_multiprocessing:
-            self.pool.close()
 
 
 def runCCEA(config_dir, experiment_name: str, trial_id: int, load_checkpoint: bool):

@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, "./src")
 
 from learning.ccea import CooperativeCoevolutionaryAlgorithm
+from domain.create_env import create_env
 
 experiment_type = "standard"
 poi_type = "static"
@@ -22,4 +23,8 @@ with open(checkpoint_path, "rb") as handle:
 
 ccea = CooperativeCoevolutionaryAlgorithm(config_path, experiment_name, trial, False)
 
-eval_infos = ccea.evaluateTeams(ccea.create_env(1), [best_team], render=True)
+eval_infos = ccea.evaluateTeams(
+    create_env(config_dir=config_path, n_envs=1, device=ccea.device),
+    [best_team],
+    render=True,
+)

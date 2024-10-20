@@ -28,7 +28,11 @@ class RoverDomain(BaseScenario):
 
         self.n_agents = kwargs.pop("n_agents", 5)
         self.n_targets = kwargs.pop("n_targets", 7)
-        self.targets_positions = kwargs.pop("targets_positions", 7)
+        self.targets_positions = kwargs.pop("targets_positions", [])
+        self.targets_values = torch.tensor(
+            kwargs.pop("targets_values", []), device=device
+        )
+        self.agents_positions = kwargs.pop("agents_positions", [])
 
         self._min_dist_between_entities = kwargs.pop("min_dist_between_entities", 0.2)
         self._lidar_range = kwargs.pop("lidar_range", 0.35)
@@ -40,7 +44,7 @@ class RoverDomain(BaseScenario):
         self._agents_per_target = kwargs.pop("agents_per_target", 2)
         self.targets_respawn = kwargs.pop("targets_respawn", False)
         self.random_spawn = kwargs.pop("random_spawn", False)
-        self.shared_reward = kwargs.pop("shared_reward", True)
+        self.use_G = kwargs.pop("use_G", False)
 
         self.covering_rew_coeff = kwargs.pop("covering_rew_coeff", 1.0)
 
@@ -100,7 +104,7 @@ class RoverDomain(BaseScenario):
                     ]
                 ),
             )
-            agent.covering_reward = torch.zeros(batch_dim, device=device)
+            agent.difference_rew = torch.zeros(batch_dim, device=device)
             world.add_agent(agent)
 
         self._targets = []
@@ -116,7 +120,7 @@ class RoverDomain(BaseScenario):
             self._targets.append(target)
 
         self.covered_targets = torch.zeros(batch_dim, self.n_targets, device=device)
-        self.shared_covering_rew = torch.zeros(batch_dim, device=device)
+        self.global_rew = torch.zeros(batch_dim, device=device)
 
         return world
 
@@ -145,12 +149,12 @@ class RoverDomain(BaseScenario):
             for target in self._targets[self.n_targets :]:
                 target.set_pos(self.get_outside_pos(env_index), batch_index=env_index)
         else:
-            for agent in self.world.agents:
+            for idx, agent in enumerate(self.world.agents):
+                pos = torch.ones(
+                    (self.world.batch_dim, self.world.dim_p), device=self.world.device
+                ) * torch.tensor(self.agents_positions[idx], device=self.world.device)
                 agent.set_pos(
-                    torch.tensor(
-                        [0.0, 0.0],
-                        device=self.world.device,
-                    ),
+                    pos,
                     batch_index=env_index,
                 )
 
@@ -169,27 +173,56 @@ class RoverDomain(BaseScenario):
 
         if is_first:
             # Calculate G
-            self.agents_pos = torch.stack(
-                [a.state.pos for a in self.world.agents], dim=1
-            )
-            self.targets_pos = torch.stack([t.state.pos for t in self._targets], dim=1)
-            self.agents_targets_dists = torch.cdist(self.agents_pos, self.targets_pos)
-            self.agents_per_target = torch.sum(
-                (self.agents_targets_dists < self._covering_range).type(torch.int),
+            agents_pos = torch.stack([a.state.pos for a in self.world.agents], dim=1)
+            targets_pos = torch.stack([t.state.pos for t in self._targets], dim=1)
+            agents_targets_dists = torch.cdist(agents_pos, targets_pos)
+            agents_per_target = torch.sum(
+                (agents_targets_dists < self._covering_range).type(torch.int),
                 dim=1,
             )
-            self.covered_targets = self.agents_per_target >= self._agents_per_target
 
-            self.shared_covering_rew[:] = 0
+            self.covered_targets = agents_per_target >= self._agents_per_target
 
-            for a in self.world.agents:
-                self.shared_covering_rew += self.agent_reward(a)
+            self.global_rew = torch.sum(
+                self.covered_targets * self.targets_values, dim=1
+            )
 
             # Calculate D
+            global_rew_without_me = torch.zeros(
+                self.world.batch_dim, device=self.world.device
+            )
             for me in self.world.agents:
+                global_rew_without_me[:] = 0
+                me.difference_rew[:] = 0
+
+                agents_without_me = [
+                    agent for agent in self.world.agents if agent != me
+                ]
+
                 agents_pos_without_me = torch.stack(
-                    [a.state.pos for agent in self.world.agents if agent != me], dim=1
+                    [a.state.pos for a in agents_without_me], dim=1
                 )
+
+                agents_targets_dists_without_me = torch.cdist(
+                    agents_pos_without_me, targets_pos
+                )
+
+                agents_per_target_without_me = torch.sum(
+                    (agents_targets_dists_without_me < self._covering_range).type(
+                        torch.int
+                    ),
+                    dim=1,
+                )
+
+                covered_targets_without_me = (
+                    agents_per_target_without_me >= self._agents_per_target
+                )
+
+                global_rew_without_me = torch.sum(
+                    covered_targets_without_me * self.targets_values, dim=1
+                )
+
+                me.difference_rew = self.global_rew - global_rew_without_me
 
         if is_last:
             self.all_time_covered_targets += self.covered_targets
@@ -198,11 +231,7 @@ class RoverDomain(BaseScenario):
                     None
                 )[self.covered_targets[:, i]]
 
-        covering_rew = (
-            agent.covering_reward
-            if not self.shared_reward
-            else self.shared_covering_rew
-        )
+        covering_rew = agent.difference_rew if not self.use_G else self.global_rew
 
         return covering_rew
 
@@ -216,12 +245,13 @@ class RoverDomain(BaseScenario):
             device=self.world.device,
         ).uniform_(-1000 * self.world.x_semidim, -10 * self.world.x_semidim)
 
-    def agent_reward(self, agent):
+    def agent_reward(self, agent, agents_targets_dists):
         agent_index = self.world.agents.index(agent)
 
-        agent.covering_reward[:] = 0
+        covering_reward = torch.zeros(self.world.batch_dim, device=self.world.device)
+
         targets_covered_by_agent = (
-            self.agents_targets_dists[:, agent_index] < self._covering_range
+            agents_targets_dists[:, agent_index] < self._covering_range
         )
 
         # dists_to_covered_targets = (targets_covered_by_agent * self.agents_targets_dists[:, agent_index])
@@ -230,10 +260,11 @@ class RoverDomain(BaseScenario):
             targets_covered_by_agent * self.covered_targets
         ).sum(dim=-1)
 
-        agent.covering_reward += (
+        covering_reward += (
             num_covered_targets_covered_by_agent * self.covering_rew_coeff
         )
-        return agent.covering_reward
+
+        return covering_reward
 
     def observation(self, agent: Agent):
 
@@ -257,11 +288,8 @@ class RoverDomain(BaseScenario):
 
     def info(self, agent: Agent) -> Dict[str, Tensor]:
         info = {
-            "covering_reward": (
-                agent.covering_reward
-                if not self.shared_reward
-                else self.shared_covering_rew
-            ),
+            "global_reward": (self.global_rew),
+            "difference_reward": (agent.difference_rew),
             "targets_covered": self.covered_targets.sum(-1),
         }
         return info
@@ -305,54 +333,46 @@ class RoverDomain(BaseScenario):
 
 
 class HeuristicPolicy(BaseHeuristicPolicy):
-    def compute_action(self, observation: torch.Tensor, u_range: float) -> torch.Tensor:
-        assert self.continuous_actions
+    def __init__(self, continuous_action, device):
 
-        # First calculate the closest point to a circle of radius circle_radius given the current position
-        circle_origin = torch.zeros(1, 2, device=observation.device)
-        circle_radius = 0.75
-        current_pos = observation[:, :2]
-        v = current_pos - circle_origin
-        closest_point_on_circ = (
-            circle_origin + v / torch.linalg.norm(v, dim=1).unsqueeze(1) * circle_radius
+        super().__init__(continuous_action)
+
+        self.device = device
+        self.theta_max = 6 * torch.pi
+        self.theta_range = torch.arange(
+            0, self.theta_max, step=self.theta_max / 600
+        ).to(device)
+
+        self.targets = torch.tensor(
+            [[-0.5, -0.5], [-0.5, 0.5], [0.5, 0.5], [0.5, -0.5]], device=device
         )
+        self.current_target = 0
 
-        # calculate the normal vector of the vector from the origin of the circle to that closest point
-        # on the circle. Adding this scaled normal vector to the other vector gives us a target point we
-        # try to reach, thus resulting in a circular motion.
-        closest_point_on_circ_normal = torch.stack(
-            [closest_point_on_circ[:, Y], -closest_point_on_circ[:, X]], dim=1
-        )
-        closest_point_on_circ_normal /= torch.linalg.norm(
-            closest_point_on_circ_normal, dim=1
-        ).unsqueeze(1)
-        closest_point_on_circ_normal *= 0.1
-        des_pos = closest_point_on_circ + closest_point_on_circ_normal
+    def compute_action(
+        self,
+        agent_position,
+        observation: torch.Tensor,
+        u_range: float,
+    ) -> torch.Tensor:
 
-        # Move towards targets within visibility range
-        lidar_targets = observation[:, 4:19]
-        target_visible = torch.any(lidar_targets < 0.3, dim=1)
-        _, target_dir_index = torch.min(lidar_targets, dim=1)
-        target_dir = target_dir_index / lidar_targets.shape[1] * 2 * torch.pi
-        target_vec = torch.stack([torch.cos(target_dir), torch.sin(target_dir)], dim=1)
-        des_pos_target = current_pos + target_vec * 0.1
-        des_pos[target_visible] = des_pos_target[target_visible]
+        des_pos = torch.zeros((1, 2), device=observation.device).to(observation.device)
 
-        if observation.shape[-1] > 19:
-            # Move away from other agents within visibility range
-            lidar_agents = observation[:, 19:31]
-            agent_visible = torch.any(lidar_agents < 0.15, dim=1)
-            _, agent_dir_index = torch.min(lidar_agents, dim=1)
-            agent_dir = agent_dir_index / lidar_agents.shape[1] * 2 * torch.pi
-            agent_vec = torch.stack([torch.cos(agent_dir), torch.sin(agent_dir)], dim=1)
-            des_pos_agent = current_pos - agent_vec * 0.1
-            des_pos[agent_visible] = des_pos_agent[agent_visible]
+        if self.current_target >= len(self.targets):
+            self.current_target = len(self.targets) - 1
+
+        des_pos[:, 0] = self.targets[self.current_target, 0]
+        des_pos[:, 1] = self.targets[self.current_target, 1]
 
         action = torch.clamp(
-            (des_pos - current_pos) * 10,
+            (des_pos - agent_position),
             min=-u_range,
             max=u_range,
         )
+
+        dist_to_target = torch.cdist(des_pos, agent_position) ** 2
+
+        if dist_to_target[0, 0] < 0.02:
+            self.current_target += 1
 
         return action
 

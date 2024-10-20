@@ -1,35 +1,35 @@
 #  Copyright (c) 2022-2024.
 #  ProrokLab (https://www.proroklab.org/)
 #  All rights reserved.
-import random
+import os
 import time
+import argparse
 
 import torch
 
 from vmas import make_env
 from vmas.simulator.utils import save_video
 from vmas.simulator.scenario import BaseScenario
+from vmas.simulator.environment import Environment
+
 from domain.rover_domain import RoverDomain, HeuristicPolicy
+from domain.create_env import create_env
 
 
 def use_vmas_env(
-    name: str = "dummy",
+    name: str,
+    env: Environment = None,
     render: bool = False,
     save_render: bool = False,
-    n_envs: int = 4,
-    n_steps: int = 400,
+    n_envs: int = 1,
+    n_steps: int = 600,
     device: str = "cpu",
-    scenario: BaseScenario = None,
-    continuous_action: bool = True,
     visualize_render: bool = True,
-    dict_spaces: bool = False,
     **kwargs,
 ):
     """Example function to use a vmas environment
 
     Args:
-        continuous_actions (bool): Whether the agents have continuous or discrete actions
-        scenario (BaseScenario): Scenario Class
         device (str): Torch device to use
         render (bool): Whether to render the scenario
         save_render (bool):  Whether to save render of the scenario
@@ -37,8 +37,6 @@ def use_vmas_env(
         n_steps (int): Number of steps before returning done
         random_action (bool): Use random actions or have all agents perform the down action
         visualize_render (bool, optional): Whether to visualize the render. Defaults to ``True``.
-        dict_spaces (bool, optional): Weather to return obs, rewards, and infos as dictionaries with agent names.
-            By default, they are lists of len # of agents
         kwargs (dict, optional): Keyword arguments to pass to the scenario
 
     Returns:
@@ -46,25 +44,14 @@ def use_vmas_env(
     """
     assert not (save_render and not render), "To save the video you have to render it"
 
-    env = make_env(
-        scenario=scenario,
-        num_envs=n_envs,
-        device=device,
-        dict_spaces=dict_spaces,
-        wrapper=None,
-        seed=None,
-        # Environment specific variables
-        **kwargs,
-    )
-
     frame_list = []  # For creating a gif
     init_time = time.time()
     step = 0
 
-    policy = HeuristicPolicy(continuous_action=continuous_action)
-    G = torch.zeros(n_envs)
+    policy = HeuristicPolicy(continuous_action=True, device=device)
+    G = torch.zeros((n_agents, n_envs)).to(device)
 
-    for _ in range(n_steps):
+    for step in range(n_steps):
         step += 1
 
         actions = []
@@ -72,14 +59,20 @@ def use_vmas_env(
         for agent in env.agents:
 
             action = policy.compute_action(
-                env.scenario.observation(agent), agent.action.u_range
+                agent_position=agent.state.pos,
+                observation=env.scenario.observation(agent),
+                u_range=agent.action.u_range,
             )
 
             actions.append(action)
 
         obs, rews, dones, info = env.step(actions)
 
-        G += torch.stack(rews, dim=0)[0]
+        if any(tensor.any() for tensor in rews):
+            print(rews)
+            print(info)
+
+        G += torch.stack(rews, dim=0)
 
         if render:
             frame = env.render(
@@ -89,8 +82,6 @@ def use_vmas_env(
             )
             if save_render:
                 frame_list.append(frame)
-
-    print(G)
 
     total_time = time.time() - init_time
 
@@ -104,18 +95,48 @@ def use_vmas_env(
 
 
 if __name__ == "__main__":
-    scenario = RoverDomain()
+    # Arg parser variables
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--hpc", default=False, help="use hpc config files", action="store_true"
+    )
+    parser.add_argument(
+        "--load_checkpoint", default=False, help="loads checkpoint", action="store_true"
+    )
+    parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
+    parser.add_argument("--model", default="mlp", help="mlp/gru/cnn/att", type=str)
+    parser.add_argument(
+        "--experiment_type",
+        default="",
+        help="standard/fitness_critic/teaming",
+        type=str,
+    )
+    parser.add_argument("--trial_id", default=0, help="Sets trial ID", type=int)
+
+    args = vars(parser.parse_args())
+
+    # Set base_config path
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    config_dir = os.path.join(dir_path, "experiments", "yamls", args["experiment_type"])
+
+    # Set configuration file
+    yaml_filename = "_".join((args["poi_type"], args["model"])) + ".yaml"
+    config_dir = os.path.join(config_dir, yaml_filename)
+
     n_agents = 3
+    n_envs = 2
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     use_vmas_env(
         name=f"RoverDomain_{n_agents}a",
-        scenario=scenario,
-        render=True,
+        env=create_env(config_dir=config_dir, n_envs=n_envs, device=device),
+        render=False,
         save_render=False,
         continuous_action=True,
-        device="cpu",
+        device="cuda",
+        n_envs=n_envs,
         # Environment specific
         n_agents=n_agents,
-        n_steps=100,
-        x_semidim=2,
-        y_semidim=2,
+        n_steps=300,
     )
