@@ -52,11 +52,9 @@ class Team(object):
 
 
 class JointTrajectory(object):
-    def __init__(
-        self,
-        joint_state_traj: list,
-    ):
+    def __init__(self, joint_state_traj: list, joint_obs_traj: list):
         self.states = joint_state_traj
+        self.observations = joint_obs_traj
 
 
 class EvalInfo(object):
@@ -274,9 +272,21 @@ class CooperativeCoevolutionaryAlgorithm:
         agent_positions = torch.stack([agent.state.pos for agent in env.agents], dim=0)
         joint_states_per_env = [torch.empty((0, 2)).to(self.device) for _ in teams]
 
-        for i, j_states in enumerate(joint_states_per_env):
+        tranposed_stacked_obs = (
+            torch.stack(observations, -1).transpose(0, 1).transpose(0, -1)
+        )
+        joint_observations_per_env = [
+            torch.empty((0, 8)).to(self.device) for _ in teams
+        ]
+
+        for i, (j_states, j_obs) in enumerate(
+            zip(joint_states_per_env, joint_observations_per_env)
+        ):
             joint_states_per_env[i] = torch.cat(
                 (j_states, agent_positions[:, i, :]), dim=0
+            )
+            joint_observations_per_env[i] = torch.cat(
+                (j_obs, tranposed_stacked_obs[:, i, :]), dim=0
             )
 
         G_list = []
@@ -311,9 +321,15 @@ class CooperativeCoevolutionaryAlgorithm:
                 [agent.state.pos for agent in env.agents], dim=0
             )
 
-            for i, j_states in enumerate(joint_states_per_env):
+            for i, (j_states, j_obs) in enumerate(
+                zip(joint_states_per_env, joint_observations_per_env)
+            ):
                 joint_states_per_env[i] = torch.cat(
                     (j_states, agent_positions[:, i, :]), dim=0
+                )
+                joint_observations_per_env[i] = torch.cat(
+                    (j_obs, stacked_obs.transpose(0, 1).transpose(0, -1)[:, i, :]),
+                    dim=0,
                 )
 
             G_list.append(torch.stack([g[: len(teams)] for g in rewards], dim=0)[0])
@@ -345,7 +361,12 @@ class CooperativeCoevolutionaryAlgorithm:
                 team_fitness=g_per_env[i],
                 agent_fitnesses=d_per_env[i],
                 joint_traj=JointTrajectory(
-                    joint_states_per_env[i],
+                    joint_state_traj=joint_states_per_env[i].reshape(
+                        self.n_agents, self.n_steps + 1, 2
+                    ),
+                    joint_obs_traj=joint_observations_per_env[i].reshape(
+                        self.n_agents, self.n_steps + 1, 8
+                    ),
                 ),
             )
             for i, team in enumerate(teams)
@@ -415,9 +436,9 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Collect trajectories from eval_infos
         for eval_info in eval_infos:
-            for idx in eval_info.team_formation:
+            for idx in eval_info.team.combination:
                 fitness_critics[idx].add(
-                    eval_info.joint_traj.observations[:, idx, :],
+                    eval_info.joint_traj.observations[idx, :, :],
                     np.float32(eval_info.team_fitness),
                 )
 
@@ -584,7 +605,7 @@ class CooperativeCoevolutionaryAlgorithm:
             # Train Fitness Critics
             if self.use_fc:
                 fc_loss = self.trainFitnessCritics(fitness_critics, eval_infos)
-                self.writeFitCritLossCSV(trial_dir, fc_loss)
+                # self.writeFitCritLossCSV(trial_dir, fc_loss)
 
             # Now assign fitnesses to each individual
             self.assignFitnesses(fitness_critics, eval_infos)

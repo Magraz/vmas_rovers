@@ -65,7 +65,7 @@ teaming:
   team_size: 0
 
 fitness_critic:
-    use_fit_crit: False
+    use_fit_crit: True
     epochs: 1
     type: MLP #MLP/ATTENTION
     loss_type: MSE+MAE #MSE/MAE/MSE+MAE

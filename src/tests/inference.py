@@ -12,7 +12,7 @@ model = "mlp"
 trial = 0
 experiment_name = "_".join((experiment_type, poi_type, model))
 checkpoint_path = f"./src/tests/checkpoint.pickle"
-config_path = "./src/experiments/yamls/standard/static_mlp.yaml"
+config_path = f"./src/experiments/yamls/{experiment_type}/{poi_type}_{model}.yaml"
 
 best_team = None
 

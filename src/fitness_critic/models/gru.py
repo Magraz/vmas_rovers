@@ -20,8 +20,6 @@ class GRU_Model(nn.Module):  # inheriting from nn.Module!
         self.rnn = nn.GRU(in_dim, hid_dim, n_layers, batch_first=True)
         self.output = nn.Linear(hid_dim, 1)
 
-        self.double()
-
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
         self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]

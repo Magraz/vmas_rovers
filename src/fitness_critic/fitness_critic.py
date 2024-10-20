@@ -27,16 +27,16 @@ class TrajectoryRewardDataset(Dataset):
 
                 case "MLP":
                     for s in traj:  # train whole trajectory
-                        self.observations.append(s)
+                        self.observations.append(s.tolist())
                         self.reward.append([g])
 
                 case "ATTENTION" | "GRU":
-                    self.observations.append(traj)
+                    self.observations.append(traj.tolist())
                     self.reward.append([g])
 
-        self.observations, self.reward = np.array(self.observations), np.array(
-            self.reward
-        )
+        self.observations, self.reward = np.array(
+            self.observations, dtype=np.float32
+        ), np.array(self.reward, dtype=np.float32)
 
     def __len__(self):
         return self.observations.shape[0]
