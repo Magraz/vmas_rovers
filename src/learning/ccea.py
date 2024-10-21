@@ -91,6 +91,8 @@ class CooperativeCoevolutionaryAlgorithm:
         # Environment data
         self.map_size = self.config["env"]["map_size"]
         self.n_steps = self.config["ccea"]["n_steps"]
+        self.observation_size = 10
+        self.action_size = 2
 
         # Agent data
         self.n_agents = len(self.config["env"]["rovers"])
@@ -122,9 +124,6 @@ class CooperativeCoevolutionaryAlgorithm:
         self.fit_crit_type = self.config["fitness_critic"]["type"]
         self.fit_crit_n_hidden = self.config["fitness_critic"]["hidden_layers"]
 
-        self.n_elites = round(
-            self.config["ccea"]["selection"]["n_elites"] * self.subpop_size
-        )
         self.n_mutants = self.subpop_size // 2
 
         self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
@@ -189,7 +188,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 agent_nn = GRU_Policy(
                     input_size=36,
                     hidden_size=self.policy_n_hidden[0],
-                    output_size=2,
+                    output_size=self.action_size,
                     n_layers=1,
                 ).to(self.device)
 
@@ -200,10 +199,10 @@ class CooperativeCoevolutionaryAlgorithm:
 
             case "MLP":
                 agent_nn = MLP_Policy(
-                    input_size=8,
+                    input_size=self.observation_size,
                     hidden_layers=len(self.policy_n_hidden),
                     hidden_size=self.policy_n_hidden[0],
-                    output_size=2,
+                    output_size=self.action_size,
                 ).to(self.device)
 
         return agent_nn
@@ -282,13 +281,15 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Store joint states per environment for the first state
         agent_positions = torch.stack([agent.state.pos for agent in env.agents], dim=0)
-        joint_states_per_env = [torch.empty((0, 2)).to(self.device) for _ in teams]
+        joint_states_per_env = [
+            torch.empty((0, self.action_size)).to(self.device) for _ in teams
+        ]
 
         tranposed_stacked_obs = (
             torch.stack(observations, -1).transpose(0, 1).transpose(0, -1)
         )
         joint_observations_per_env = [
-            torch.empty((0, 8)).to(self.device) for _ in teams
+            torch.empty((0, self.observation_size)).to(self.device) for _ in teams
         ]
 
         for i, (j_states, j_obs) in enumerate(
@@ -310,7 +311,8 @@ class CooperativeCoevolutionaryAlgorithm:
             stacked_obs = torch.stack(observations, -1)
 
             actions = [
-                torch.empty((0, 2)).to(self.device) for _ in range(self.n_agents)
+                torch.empty((0, self.action_size)).to(self.device)
+                for _ in range(self.n_agents)
             ]
 
             for observation, joint_policy in zip(stacked_obs, joint_policies):
@@ -374,10 +376,10 @@ class CooperativeCoevolutionaryAlgorithm:
                 agent_fitnesses=d_per_env[i],
                 joint_traj=JointTrajectory(
                     joint_state_traj=joint_states_per_env[i].reshape(
-                        self.n_agents, self.n_steps + 1, 2
+                        self.n_agents, self.n_steps + 1, self.action_size
                     ),
                     joint_obs_traj=joint_observations_per_env[i].reshape(
-                        self.n_agents, self.n_steps + 1, 8
+                        self.n_agents, self.n_steps + 1, self.observation_size
                     ),
                 ),
             )
@@ -388,7 +390,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def mutateIndividual(self, individual):
 
-        individual *= np.random.normal(
+        individual += np.random.normal(
             loc=self.config["ccea"]["mutation"]["mean"],
             scale=self.std_dev_list[self.gen],
             size=np.shape(individual),

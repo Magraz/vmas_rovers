@@ -282,11 +282,13 @@ class RoverDomain(BaseScenario):
             -lidar_measures, kernel_size=resolution, stride=resolution
         ).squeeze(0)
 
-        dense_lidar_measures = F.tanh(
+        dense_lidar_measures = F.sigmoid(
             torch.abs(dense_lidar_measures - self._lidar_range)
         )
 
-        return dense_lidar_measures
+        obs = torch.cat((agent.state.pos, dense_lidar_measures), dim=-1)
+
+        return obs
 
     def info(self, agent: Agent) -> Dict[str, Tensor]:
         info = {
