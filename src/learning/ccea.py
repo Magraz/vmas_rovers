@@ -131,6 +131,18 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.n_gens = self.config["ccea"]["n_gens"]
 
+        self.std_dev_list = np.arange(
+            start=self.config["ccea"]["mutation"]["max_std_deviation"],
+            stop=self.config["ccea"]["mutation"]["min_std_deviation"],
+            step=-(
+                (
+                    self.config["ccea"]["mutation"]["max_std_deviation"]
+                    - self.config["ccea"]["mutation"]["min_std_deviation"]
+                )
+                / (self.n_gens + 1)
+            ),
+        )
+
         self.nn_template = self.generateTemplateNN()
         self.rover_nn_size = self.nn_template.num_params
 
@@ -378,7 +390,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         individual *= np.random.normal(
             loc=self.config["ccea"]["mutation"]["mean"],
-            scale=self.config["ccea"]["mutation"]["std_deviation"],
+            scale=self.std_dev_list[self.gen],
             size=np.shape(individual),
         )
 

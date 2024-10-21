@@ -92,7 +92,8 @@ ccea:
 
   mutation:
     mean: 1.0
-    std_deviation: 0.05
+    min_std_deviation: 0.05
+    max_std_deviation: 0.2
 
   n_steps: 300
   n_gens: 3000
