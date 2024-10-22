@@ -14,7 +14,7 @@ from vmas.simulator.core import Agent, Entity, Landmark, Sphere, World
 from vmas.simulator.heuristic_policy import BaseHeuristicPolicy
 from vmas.simulator.scenario import BaseScenario
 from vmas.simulator.sensors import Lidar
-from vmas.simulator.utils import Color, ScenarioUtils, X, Y
+from vmas.simulator.utils import Color, ScenarioUtils
 
 if typing.TYPE_CHECKING:
     from vmas.simulator.rendering import Geom
@@ -91,6 +91,7 @@ class RoverDomain(BaseScenario):
                             max_range=self._lidar_range,
                             entity_filter=entity_filter_targets,
                             render_color=Color.GREEN,
+                            render=False,
                         )
                     ]
                     + [
@@ -100,6 +101,7 @@ class RoverDomain(BaseScenario):
                             max_range=self._lidar_range,
                             entity_filter=entity_filter_agents,
                             render_color=Color.BLUE,
+                            render=False,
                         )
                     ]
                 ),
@@ -314,24 +316,24 @@ class RoverDomain(BaseScenario):
             range_circle.set_color(*self.target_color.value)
             geoms.append(range_circle)
         # Communication lines
-        for i, agent1 in enumerate(self.world.agents):
-            for j, agent2 in enumerate(self.world.agents):
-                if j <= i:
-                    continue
-                agent_dist = torch.linalg.vector_norm(
-                    agent1.state.pos - agent2.state.pos, dim=-1
-                )
-                if agent_dist[env_index] <= self._comms_range:
-                    color = Color.BLACK.value
-                    line = rendering.Line(
-                        (agent1.state.pos[env_index]),
-                        (agent2.state.pos[env_index]),
-                        width=1,
-                    )
-                    xform = rendering.Transform()
-                    line.add_attr(xform)
-                    line.set_color(*color)
-                    geoms.append(line)
+        # for i, agent1 in enumerate(self.world.agents):
+        #     for j, agent2 in enumerate(self.world.agents):
+        #         if j <= i:
+        #             continue
+        #         agent_dist = torch.linalg.vector_norm(
+        #             agent1.state.pos - agent2.state.pos, dim=-1
+        #         )
+        #         if agent_dist[env_index] <= self._comms_range:
+        #             color = Color.BLACK.value
+        #             line = rendering.Line(
+        #                 (agent1.state.pos[env_index]),
+        #                 (agent2.state.pos[env_index]),
+        #                 width=1,
+        #             )
+        #             xform = rendering.Transform()
+        #             line.add_attr(xform)
+        #             line.set_color(*color)
+        #             geoms.append(line)
 
         return geoms
 

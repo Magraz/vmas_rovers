@@ -27,4 +27,5 @@ eval_infos = ccea.evaluateTeams(
     create_env(config_dir=config_path, n_envs=1, device=ccea.device),
     [best_team],
     render=True,
+    save_render=False,
 )

@@ -6,6 +6,7 @@ import torch
 import random
 
 from vmas.simulator.environment import Environment
+from vmas.simulator.utils import save_video
 
 from policies.mlp import MLP_Policy
 from policies.gru import GRU_Policy
@@ -77,6 +78,7 @@ class CooperativeCoevolutionaryAlgorithm:
     ):
 
         self.trial_id = trial_id
+        self.video_name = f"{experiment_name}_{trial_id}"
         self.config_dir = Path(os.path.expanduser(config_dir))
         self.trials_dir = os.path.join(
             self.config_dir.parents[2], "results", experiment_name
@@ -263,7 +265,13 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return teams
 
-    def evaluateTeams(self, env: Environment, teams: list[Team], render: bool = False):
+    def evaluateTeams(
+        self,
+        env: Environment,
+        teams: list[Team],
+        render: bool = False,
+        save_render: bool = False,
+    ):
         # Set up models
         joint_policies = [
             [deepcopy(self.nn_template) for _ in range(self.team_size)] for _ in teams
@@ -304,6 +312,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         G_list = []
         D_list = []
+        frame_list = []
 
         # Start evaluation
         for _ in range(self.n_steps):
@@ -352,12 +361,18 @@ class CooperativeCoevolutionaryAlgorithm:
                 torch.stack([d[len(teams) : len(teams) * 2] for d in rewards], dim=0)
             )
 
+            # Visualization
             if render:
                 frame = env.render(
                     mode="rgb_array",
                     agent_index_focus=None,  # Can give the camera an agent index to focus on
                     visualize_when_rgb=True,
                 )
+                if save_render:
+                    frame_list.append(frame)
+        # Save video
+        if render and save_render:
+            save_video(self.video_name, frame_list, fps=1 / env.scenario.world.dt)
 
         # Compute team fitness
         match (self.fitness_method):
