@@ -19,6 +19,8 @@ from vmas.simulator.utils import Color, ScenarioUtils
 if typing.TYPE_CHECKING:
     from vmas.simulator.rendering import Geom
 
+from domain.custom_sensors import SectorDensity
+
 
 class RoverDomain(BaseScenario):
     def make_world(self, batch_dim: int, device: torch.device, **kwargs):
@@ -83,28 +85,29 @@ class RoverDomain(BaseScenario):
                 name=f"agent_{i}",
                 collide=True,
                 shape=Sphere(radius=self.agent_radius),
-                sensors=(
-                    [
-                        Lidar(
-                            world,
-                            n_rays=self.n_lidar_rays_entities,
-                            max_range=self._lidar_range,
-                            entity_filter=entity_filter_targets,
-                            render_color=Color.GREEN,
-                            render=False,
-                        )
-                    ]
-                    + [
-                        Lidar(
-                            world,
-                            n_rays=self.n_lidar_rays_agents,
-                            max_range=self._lidar_range,
-                            entity_filter=entity_filter_agents,
-                            render_color=Color.BLUE,
-                            render=False,
-                        )
-                    ]
-                ),
+                sensors=([SectorDensity(world, n_rays=4, max_range=self._lidar_range)]),
+                # sensors=(
+                #     [
+                #         Lidar(
+                #             world,
+                #             n_rays=self.n_lidar_rays_entities,
+                #             max_range=self._lidar_range,
+                #             entity_filter=entity_filter_targets,
+                #             render_color=Color.GREEN,
+                #             render=False,
+                #         )
+                #     ]
+                #     + [
+                #         Lidar(
+                #             world,
+                #             n_rays=self.n_lidar_rays_agents,
+                #             max_range=self._lidar_range,
+                #             entity_filter=entity_filter_agents,
+                #             render_color=Color.BLUE,
+                #             render=False,
+                #         )
+                #     ]
+                # ),
             )
             agent.difference_rew = torch.zeros(batch_dim, device=device)
             world.add_agent(agent)
@@ -118,6 +121,7 @@ class RoverDomain(BaseScenario):
                 shape=Sphere(radius=self.target_radius),
                 color=self.target_color,
             )
+            target.value = self.targets_values[i]
             world.add_landmark(target)
             self._targets.append(target)
 
