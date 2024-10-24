@@ -93,7 +93,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Environment data
         self.map_size = self.config["env"]["map_size"]
         self.n_steps = self.config["ccea"]["n_steps"]
-        self.observation_size = 10
+        self.observation_size = 8
         self.action_size = 2
 
         # Agent data
@@ -370,6 +370,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 )
                 if save_render:
                     frame_list.append(frame)
+
         # Save video
         if render and save_render:
             save_video(self.video_name, frame_list, fps=1 / env.scenario.world.dt)
@@ -382,6 +383,10 @@ class CooperativeCoevolutionaryAlgorithm:
                 d_per_env = torch.transpose(
                     torch.sum(torch.stack(D_list), dim=0), dim0=0, dim1=1
                 ).tolist()
+
+            case "last_step":
+                g_per_env = G_list[-1].tolist()
+                d_per_env = torch.transpose(D_list[-1], dim0=0, dim1=1).tolist()
 
         # Generate evaluation infos
         eval_infos = [

@@ -53,6 +53,7 @@ def use_vmas_env(
     D_total = torch.zeros((n_agents, n_envs)).to(device)
     G_list = []
     D_list = []
+    obs_list = []
 
     for step in range(n_steps):
         step += 1
@@ -72,6 +73,8 @@ def use_vmas_env(
         obs, rews, dones, info = env.step(actions)
         temp = [g[:n_envs] for g in rews]
 
+        obs_list.append(obs[0][0])
+
         G_list.append(torch.stack([g[:n_envs] for g in rews], dim=0)[0])
         D_list.append(torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0))
 
@@ -82,10 +85,10 @@ def use_vmas_env(
         D = torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
 
         if any(tensor.any() for tensor in rews):
-            # print("G")
-            # print(G)
-            # print("D")
-            # print(D)
+            print("G")
+            print(G)
+            print("D")
+            print(D)
 
             print("Total G")
             print(G_total)
@@ -107,6 +110,8 @@ def use_vmas_env(
     print("D List Agg")
     D_agg = torch.sum(torch.stack(D_list), dim=0)
     print(torch.transpose(D_agg, dim0=0, dim1=1))
+    print("Obs List")
+    # print(obs_list)
 
     # print("G List")
     # print(G_list)
@@ -161,7 +166,7 @@ if __name__ == "__main__":
     use_vmas_env(
         name=f"RoverDomain_{n_agents}a",
         env=create_env(config_dir=config_dir, n_envs=n_envs, device=device),
-        render=False,
+        render=True,
         save_render=False,
         continuous_action=True,
         device="cuda",

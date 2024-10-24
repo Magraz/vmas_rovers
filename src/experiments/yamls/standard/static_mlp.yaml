@@ -85,14 +85,14 @@ ccea:
 
   evaluation:
     n_evaluations: 1
-    fitness_method: aggregate #aggregate/last_step
+    fitness_method: last_step #aggregate/last_step
 
   mutation:
     mean: 0.0
     min_std_deviation: 0.02
     max_std_deviation: 0.2
 
-  n_steps: 300
+  n_steps: 50
   n_gens: 3000
 
 data:

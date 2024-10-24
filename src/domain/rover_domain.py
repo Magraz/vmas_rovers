@@ -72,58 +72,29 @@ class RoverDomain(BaseScenario):
             drag=0.25,
         )
 
-        # Add agents
-        entity_filter_agents: Callable[[Entity], bool] = lambda e: e.name.startswith(
-            "agent"
-        )
-        entity_filter_targets: Callable[[Entity], bool] = lambda e: e.name.startswith(
-            "target"
-        )
-        for i in range(self.n_agents):
-            # Constraint: all agents have same action range and multiplier
-            agent = Agent(
-                name=f"agent_{i}",
-                collide=True,
-                shape=Sphere(radius=self.agent_radius),
-                sensors=([SectorDensity(world, n_rays=4, max_range=self._lidar_range)]),
-                # sensors=(
-                #     [
-                #         Lidar(
-                #             world,
-                #             n_rays=self.n_lidar_rays_entities,
-                #             max_range=self._lidar_range,
-                #             entity_filter=entity_filter_targets,
-                #             render_color=Color.GREEN,
-                #             render=False,
-                #         )
-                #     ]
-                #     + [
-                #         Lidar(
-                #             world,
-                #             n_rays=self.n_lidar_rays_agents,
-                #             max_range=self._lidar_range,
-                #             entity_filter=entity_filter_agents,
-                #             render_color=Color.BLUE,
-                #             render=False,
-                #         )
-                #     ]
-                # ),
-            )
-            agent.difference_rew = torch.zeros(batch_dim, device=device)
-            world.add_agent(agent)
-
         self._targets = []
         for i in range(self.n_targets):
             target = Landmark(
                 name=f"target_{i}",
-                collide=True,
-                movable=False,
+                collide=False,
                 shape=Sphere(radius=self.target_radius),
                 color=self.target_color,
             )
             target.value = self.targets_values[i]
+
             world.add_landmark(target)
             self._targets.append(target)
+
+        for i in range(self.n_agents):
+            # Constraint: all agents have same action range and multiplier
+            agent = Agent(
+                name=f"agent_{i}",
+                collide=False,
+                shape=Sphere(radius=self.agent_radius),
+                sensors=([SectorDensity(world, n_rays=4, max_range=self._lidar_range)]),
+            )
+            agent.difference_rew = torch.zeros(batch_dim, device=device)
+            world.add_agent(agent)
 
         self.covered_targets = torch.zeros(batch_dim, self.n_targets, device=device)
         self.global_rew = torch.zeros(batch_dim, device=device)
@@ -189,8 +160,29 @@ class RoverDomain(BaseScenario):
 
             self.covered_targets = agents_per_target >= self._agents_per_target
 
+            covered_targets_mask = agents_targets_dists < self._covering_range
+
+            covered_targets_dists = covered_targets_mask * agents_targets_dists
+
+            masked_covered_targets_dists = torch.where(
+                covered_targets_dists == 0, float("inf"), covered_targets_dists
+            )
+
+            min_covered_targets_dists, _ = torch.min(
+                masked_covered_targets_dists, dim=1
+            )
+
+            min_covered_targets_dists[torch.isinf(min_covered_targets_dists)] = 0
+
+            global_reward_spread = (
+                self.covered_targets * self.targets_values
+            ) / min_covered_targets_dists
+
+            global_reward_spread[torch.isnan(global_reward_spread)] = 0
+
             self.global_rew = torch.sum(
-                self.covered_targets * self.targets_values, dim=1
+                global_reward_spread,
+                dim=1,
             )
 
             # Calculate D
@@ -224,20 +216,24 @@ class RoverDomain(BaseScenario):
                     agents_per_target_without_me >= self._agents_per_target
                 )
 
-                global_rew_without_me = torch.sum(
-                    covered_targets_without_me * self.targets_values, dim=1
-                )
+                global_reward_spread = (
+                    covered_targets_without_me * self.targets_values
+                ) / min_covered_targets_dists
+
+                global_reward_spread[torch.isnan(global_reward_spread)] = 0
+
+                global_rew_without_me = torch.sum(global_reward_spread, dim=1)
 
                 me.difference_rew = self.global_rew - global_rew_without_me
 
         if is_last:
             self.all_time_covered_targets += self.covered_targets
-            for i, target in enumerate(self._targets):
-                target.state.pos[self.covered_targets[:, i]] = self.get_outside_pos(
-                    None
-                )[self.covered_targets[:, i]]
 
-        # covering_rew = agent.difference_rew if not self.use_G else self.global_rew
+            # # Make targets dissapear once taken
+            # for i, target in enumerate(self._targets):
+            #     target.state.pos[self.covered_targets[:, i]] = self.get_outside_pos(
+            #         None
+            #     )[self.covered_targets[:, i]]
 
         covering_rew = torch.cat([self.global_rew, agent.difference_rew])
 
@@ -276,23 +272,7 @@ class RoverDomain(BaseScenario):
 
     def observation(self, agent: Agent):
 
-        lidar_measures = torch.cat(
-            (agent.sensors[0].measure(), agent.sensors[1].measure()), dim=-1
-        ).unsqueeze(0)
-
-        sectors = 4
-        resolution = self.n_lidar_rays_agents // sectors
-
-        # Minpool lidar measures to get a dense lidar measure per sector
-        dense_lidar_measures = -F.max_pool1d(
-            -lidar_measures, kernel_size=resolution, stride=resolution
-        ).squeeze(0)
-
-        dense_lidar_measures = F.sigmoid(
-            torch.abs(dense_lidar_measures - self._lidar_range)
-        )
-
-        obs = torch.cat((agent.state.pos, dense_lidar_measures), dim=-1)
+        obs = agent.sensors[0].measure()
 
         return obs
 
