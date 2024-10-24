@@ -113,8 +113,8 @@ class SectorDensity(Sensor):
                 dim=0,
             )
 
-        dists_2_agents = torch.clamp(dists_2_agents, min=1e-3)
-        dists_2_targets = torch.clamp(dists_2_targets, min=1e-3)
+        dists_2_agents = torch.clamp(dists_2_agents, min=1e-2)
+        dists_2_targets = torch.clamp(dists_2_targets, min=1e-2)
 
         agent_density_per_sector = torch.zeros(
             (self._sectors, self._world.batch_dim)

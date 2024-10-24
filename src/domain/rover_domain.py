@@ -168,6 +168,8 @@ class RoverDomain(BaseScenario):
                 masked_covered_targets_dists, dim=1
             )
 
+            min_covered_targets_dists = torch.clamp(min_covered_targets_dists, min=1e-2)
+
             min_covered_targets_dists[torch.isinf(min_covered_targets_dists)] = 0
 
             global_reward_spread = torch.log10(
@@ -231,6 +233,10 @@ class RoverDomain(BaseScenario):
 
                 min_covered_targets_dists_without_me, _ = torch.min(
                     masked_covered_targets_dists_without_me, dim=1
+                )
+
+                min_covered_targets_dists_without_me = torch.clamp(
+                    min_covered_targets_dists_without_me, min=1e-2
                 )
 
                 min_covered_targets_dists_without_me[
