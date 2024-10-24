@@ -40,13 +40,9 @@ class RoverDomain(BaseScenario):
         self._lidar_range = kwargs.pop("lidar_range", 0.35)
         self._covering_range = kwargs.pop("covering_range", 0.25)
 
-        self.n_lidar_rays_entities = kwargs.pop("n_lidar_rays_entities", 16)
-        self.n_lidar_rays_agents = kwargs.pop("n_lidar_rays_agents", 16)
-
         self._agents_per_target = kwargs.pop("agents_per_target", 2)
         self.targets_respawn = kwargs.pop("targets_respawn", False)
         self.random_spawn = kwargs.pop("random_spawn", False)
-        self.use_G = kwargs.pop("use_G", False)
 
         self.covering_rew_coeff = kwargs.pop("covering_rew_coeff", 1.0)
 
@@ -91,7 +87,7 @@ class RoverDomain(BaseScenario):
                 name=f"agent_{i}",
                 collide=False,
                 shape=Sphere(radius=self.agent_radius),
-                sensors=([SectorDensity(world, n_rays=4, max_range=self._lidar_range)]),
+                sensors=([SectorDensity(world, max_range=self._lidar_range)]),
             )
             agent.difference_rew = torch.zeros(batch_dim, device=device)
             world.add_agent(agent)
@@ -174,11 +170,14 @@ class RoverDomain(BaseScenario):
 
             min_covered_targets_dists[torch.isinf(min_covered_targets_dists)] = 0
 
-            global_reward_spread = (
-                self.covered_targets * self.targets_values
-            ) / min_covered_targets_dists
+            global_reward_spread = torch.log10(
+                self.covered_targets / min_covered_targets_dists
+            )
+
+            global_reward_spread *= self.targets_values
 
             global_reward_spread[torch.isnan(global_reward_spread)] = 0
+            global_reward_spread[torch.isinf(global_reward_spread)] = 0
 
             self.global_rew = torch.sum(
                 global_reward_spread,
@@ -216,11 +215,36 @@ class RoverDomain(BaseScenario):
                     agents_per_target_without_me >= self._agents_per_target
                 )
 
-                global_reward_spread = (
-                    covered_targets_without_me * self.targets_values
-                ) / min_covered_targets_dists
+                covered_targets_mask = (
+                    agents_targets_dists_without_me < self._covering_range
+                )
+
+                covered_targets_dists_without_me = (
+                    covered_targets_mask * agents_targets_dists_without_me
+                )
+
+                masked_covered_targets_dists_without_me = torch.where(
+                    covered_targets_dists_without_me == 0,
+                    float("inf"),
+                    covered_targets_dists_without_me,
+                )
+
+                min_covered_targets_dists_without_me, _ = torch.min(
+                    masked_covered_targets_dists_without_me, dim=1
+                )
+
+                min_covered_targets_dists_without_me[
+                    torch.isinf(min_covered_targets_dists_without_me)
+                ] = 0
+
+                global_reward_spread = torch.log10(
+                    covered_targets_without_me / min_covered_targets_dists_without_me
+                )
+
+                global_reward_spread *= self.targets_values
 
                 global_reward_spread[torch.isnan(global_reward_spread)] = 0
+                global_reward_spread[torch.isinf(global_reward_spread)] = 0
 
                 global_rew_without_me = torch.sum(global_reward_spread, dim=1)
 

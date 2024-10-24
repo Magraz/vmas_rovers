@@ -173,5 +173,5 @@ if __name__ == "__main__":
         n_envs=n_envs,
         # Environment specific
         n_agents=n_agents,
-        n_steps=300,
+        n_steps=200,
     )

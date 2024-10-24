@@ -23,18 +23,17 @@ class SectorDensity(Sensor):
         world: vmas.simulator.core.World,
         angle_start: float = 0.0,
         angle_end: float = 2 * torch.pi,
-        n_rays: int = 4,
         max_range: float = 1.0,
         sectors: int = 4,
     ):
         super().__init__(world)
         if (angle_start - angle_end) % (torch.pi * 2) < 1e-5:
             angles = torch.linspace(
-                angle_start, angle_end, n_rays + 1, device=self._world.device
-            )[:n_rays]
+                angle_start, angle_end, sectors + 1, device=self._world.device
+            )[:sectors]
         else:
             angles = torch.linspace(
-                angle_start, angle_end, n_rays, device=self._world.device
+                angle_start, angle_end, sectors, device=self._world.device
             )
 
         self._angles = angles
@@ -142,8 +141,12 @@ class SectorDensity(Sensor):
                 )
 
             # Get distances within sector
+
             dist_2_agents_in_sector = dists_2_agents * agents_in_sector
             dist_2_targets_in_sector = dists_2_targets * targets_in_sector
+
+            dist_2_agents_in_sector[dist_2_agents_in_sector > self._max_range] = 0
+            dist_2_targets_in_sector[dist_2_targets_in_sector > self._max_range] = 0
 
             # Get distances greater than zero within sector
             filtered_agent_dists = 1 / dist_2_agents_in_sector
