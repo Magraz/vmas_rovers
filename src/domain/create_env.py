@@ -20,7 +20,7 @@ def create_env(config_dir, n_envs: int, device: str) -> Environment:
     # Agent data
     n_agents = len(config["env"]["rovers"])
     agents_positions = [poi["position"]["fixed"] for poi in config["env"]["rovers"]]
-    lidar_range = [rover["lidar"]["range"] for rover in config["env"]["rovers"]]
+    lidar_range = [rover["observation_radius"] for rover in config["env"]["rovers"]]
 
     # POIs data
     n_pois = len(config["env"]["pois"])
