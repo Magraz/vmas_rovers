@@ -30,6 +30,7 @@ class RoverDomain(BaseScenario):
 
         self.n_agents = kwargs.pop("n_agents", 5)
         self.n_targets = kwargs.pop("n_targets", 7)
+        self.use_order = kwargs.pop("use_order", False)
         self.targets_positions = kwargs.pop("targets_positions", [])
         self.targets_orders = kwargs.pop("targets_orders", [])
         self.targets_types = kwargs.pop("targets_types", [])
@@ -96,11 +97,12 @@ class RoverDomain(BaseScenario):
             agent.difference_rew = torch.zeros(batch_dim, device=device)
             world.add_agent(agent)
 
+        self.current_order_per_env = torch.zeros((batch_dim, 1), device=device)
+
+        self.order_tensor = torch.tensor(self.targets_orders, device=device)
+
         self.global_rew = torch.zeros(batch_dim, device=device)
         self.covered_targets = torch.zeros((batch_dim, self.n_targets), device=device)
-        self.order_mask = torch.zeros(
-            (batch_dim, self.n_agents, self.n_targets), device=device
-        ).to(torch.bool)
 
         return world
 
@@ -147,6 +149,10 @@ class RoverDomain(BaseScenario):
                     batch_index=env_index,
                 )
 
+    def get_order_mask(self, covered_targets):
+        current_order_tensor = covered_targets * self.order_tensor
+        return current_order_tensor == self.current_order_per_env
+
     def calculate_global_reward(self, targets_pos, agent: Agent):
 
         agents_pos = torch.stack([a.state.pos for a in self.world.agents], dim=1)
@@ -159,11 +165,12 @@ class RoverDomain(BaseScenario):
 
         self.covered_targets = agents_per_target >= self._agents_per_target
 
-        agents_covering_targets_mask = agents_targets_dists < self._covering_range
+        # Get order mask
+        if self.use_order:
+            self.covered_targets &= self.get_order_mask(self.covered_targets)
 
-        targets_observed_in_order_per_agent = (
-            agents_covering_targets_mask * self.order_mask
-        )
+        # After order has been taken into account continue
+        agents_covering_targets_mask = agents_targets_dists < self._covering_range
 
         covered_targets_dists = agents_covering_targets_mask * agents_targets_dists
 
@@ -217,6 +224,12 @@ class RoverDomain(BaseScenario):
         covered_targets_without_me = (
             agents_per_target_without_me >= self._agents_per_target
         )
+
+        # Get order mask
+        if self.use_order:
+            covered_targets_without_me &= self.get_order_mask(
+                covered_targets_without_me
+            )
 
         covered_targets_mask = agents_targets_dists_without_me < self._covering_range
 
@@ -272,9 +285,9 @@ class RoverDomain(BaseScenario):
 
         if is_last:
             self.all_time_covered_targets += self.covered_targets
-
-            for i, target in enumerate(self._targets):
-                targets_per_env = self.all_time_covered_targets[:, i]
+            self.current_order_per_env = torch.sum(
+                self.all_time_covered_targets, dim=1
+            ).unsqueeze(-1)
 
         covering_rew = torch.cat([self.global_rew, agent.difference_rew])
 

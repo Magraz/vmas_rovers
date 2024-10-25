@@ -1,46 +1,53 @@
 env:
   map_size: [1.0, 1.0]
+  use_order: False
 
   rovers:
-    - observation_radius: 2
+    - observation_radius: 1
+      type: 0
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
     
-    - observation_radius: 2
+    - observation_radius: 1
+      type: 0
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
-      
+          
   pois:
-    - type: static
-      value: 4.0
+    - value: 4.0
       observation_radius: 0.25
       coupling: 1
+      type: 0
+      order: 0
       position:
         spawn_rule: fixed
         fixed: [-0.5, -0.5]
     
-    - type: static
-      value: 2.0
+    - value: 2.0
       observation_radius: 0.25
       coupling: 1
+      type: 0
+      order: 1
       position:
         spawn_rule: fixed
         fixed: [-0.5, 0.5]
     
-    - type: static
-      value: 4.0
+    - value: 4.0
       observation_radius: 0.25
       coupling: 1
+      type: 0
+      order: 2
       position:
         spawn_rule: fixed
         fixed: [0.5, 0.5]
 
-    - type: static
-      value: 2.0
+    - value: 2.0
       observation_radius: 0.25
       coupling: 1
+      type: 0
+      order: 3
       position:
         spawn_rule: fixed
         fixed: [0.5, -0.5]
@@ -72,7 +79,7 @@ ccea:
 
   evaluation:
     n_evaluations: 1
-    fitness_method: last_step #aggregate/last_step
+    fitness_calculation: aggregate #aggregate/last_step
 
   mutation:
     mean: 0.0
@@ -83,4 +90,4 @@ ccea:
   n_gens: 5000
 
 data:
-  n_gens_between_save: 50
+  n_gens_between_save: 40

@@ -95,7 +95,6 @@ def use_vmas_env(
             print("Total D")
             print(D_total)
 
-        print(obs)
         if render:
             frame = env.render(
                 mode="rgb_array",
@@ -111,7 +110,7 @@ def use_vmas_env(
     print("D List Agg")
     D_agg = torch.sum(torch.stack(D_list), dim=0)
     print(torch.transpose(D_agg, dim0=0, dim1=1))
-    print("Obs List")
+    # print("Obs List")
     # print(obs_list)
 
     # print("G List")
@@ -160,7 +159,7 @@ if __name__ == "__main__":
     yaml_filename = "_".join((args["poi_type"], args["model"])) + ".yaml"
     config_dir = os.path.join(config_dir, yaml_filename)
 
-    n_agents = 4
+    n_agents = 3
     n_envs = 5
     device = "cuda" if torch.cuda.is_available() else "cpu"
 

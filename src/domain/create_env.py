@@ -30,6 +30,7 @@ def create_env(config_dir, n_envs: int, device: str) -> Environment:
     poi_orders = [poi["order"] for poi in config["env"]["pois"]]
     coupling = [poi["coupling"] for poi in config["env"]["pois"]]
     obs_radius = [poi["observation_radius"] for poi in config["env"]["pois"]]
+    use_order = config["env"]["use_order"]
 
     # Set up the enviornment
     env = make_env(
@@ -50,6 +51,7 @@ def create_env(config_dir, n_envs: int, device: str) -> Environment:
         lidar_range=lidar_range[0],
         targets_types=poi_types,
         targets_orders=poi_orders,
+        use_order=use_order,
     )
 
     return env

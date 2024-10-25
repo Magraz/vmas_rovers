@@ -127,7 +127,9 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.n_mutants = self.subpop_size // 2
 
-        self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
+        self.fitness_calculation = self.config["ccea"]["evaluation"][
+            "fitness_calculation"
+        ]
 
         self.n_gens = self.config["ccea"]["n_gens"]
 
@@ -372,7 +374,7 @@ class CooperativeCoevolutionaryAlgorithm:
             save_video(self.video_name, frame_list, fps=1 / env.scenario.world.dt)
 
         # Compute team fitness
-        match (self.fitness_method):
+        match (self.fitness_calculation):
 
             case "aggregate":
                 g_per_env = torch.sum(torch.stack(G_list), dim=0).tolist()
