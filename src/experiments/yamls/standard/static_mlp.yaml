@@ -2,35 +2,21 @@ env:
   map_size: [1.0, 1.0]
 
   rovers:
-    - lidar:
-        range: 1.5
+    - observation_radius: 2
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
     
-    - lidar:
-        range: 1.5
+    - observation_radius: 2
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
       
-    - lidar:
-        range: 1.5
-      position:
-        spawn_rule: fixed
-        fixed: [0.0, 0.0]
-    
-    - lidar:
-        range: 1.5
-      position:
-        spawn_rule: fixed
-        fixed: [0.0, 0.0]
-
   pois:
     - type: static
-      value: 2.0
+      value: 4.0
       observation_radius: 0.25
-      coupling: 2
+      coupling: 1
       position:
         spawn_rule: fixed
         fixed: [-0.5, -0.5]
@@ -38,15 +24,15 @@ env:
     - type: static
       value: 2.0
       observation_radius: 0.25
-      coupling: 2
+      coupling: 1
       position:
         spawn_rule: fixed
         fixed: [-0.5, 0.5]
     
     - type: static
-      value: 2.0
+      value: 4.0
       observation_radius: 0.25
-      coupling: 2
+      coupling: 1
       position:
         spawn_rule: fixed
         fixed: [0.5, 0.5]
@@ -54,7 +40,7 @@ env:
     - type: static
       value: 2.0
       observation_radius: 0.25
-      coupling: 2
+      coupling: 1
       position:
         spawn_rule: fixed
         fixed: [0.5, -0.5]
@@ -74,6 +60,8 @@ ccea:
 
   weight_initialization: kaiming
 
+  fitness_shaping: hof_difference #global/difference/
+
   policy:
     type: MLP
     hidden_layers: [32, 32]
@@ -88,8 +76,8 @@ ccea:
 
   mutation:
     mean: 0.0
-    min_std_deviation: 0.02
-    max_std_deviation: 0.2
+    min_std_deviation: 0.05
+    max_std_deviation: 0.25
 
   n_steps: 50
   n_gens: 5000

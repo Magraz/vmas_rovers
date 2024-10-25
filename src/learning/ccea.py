@@ -37,15 +37,12 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-class Agent(object):
-    def __init__(self, idx: int, parameters: list):
-        self.idx = idx
-        self.parameters = parameters
-
-
 class Team(object):
     def __init__(
-        self, idx: int, individuals: list[Agent] = None, combination: list = None
+        self,
+        idx: int,
+        individuals: list = None,
+        combination: list = None,
     ):
         self.idx = idx
         self.individuals = individuals if individuals is not None else []
@@ -117,6 +114,8 @@ class CooperativeCoevolutionaryAlgorithm:
             combo for combo in combinations(range(self.n_agents), self.team_size)
         ]
 
+        self.fitness_shaping_method = self.config["ccea"]["fitness_shaping"]
+
         self.subpop_size = self.config["ccea"]["population"]["subpopulation_size"]
 
         self.policy_n_hidden = self.config["ccea"]["policy"]["hidden_layers"]
@@ -144,8 +143,10 @@ class CooperativeCoevolutionaryAlgorithm:
             ),
         )
 
+        self.alpha = 0.0
+        self.alpha_max = 0.5
+
         self.nn_template = self.generateTemplateNN()
-        self.rover_nn_size = self.nn_template.num_params
 
         # Data loading
         self.load_checkpoint = load_checkpoint
@@ -209,14 +210,14 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return agent_nn
 
-    def getBestAgents(self, population) -> list[Agent]:
+    def getBestAgents(self, population) -> list:
         best_agents = []
 
         # Get best agents
-        for idx, subpop in enumerate(population):
+        for subpop in population:
             # Get the best N individuals
             best_ind = tools.selBest(subpop, 1)[0]
-            best_agents.append(Agent(idx=idx, parameters=best_ind))
+            best_agents.append(best_ind)
 
         return best_agents
 
@@ -226,7 +227,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Create one env
         env = create_env(self.config_dir, n_envs=1, device=self.device)
 
-        return self.evaluateTeams(env, eval_teams)
+        return self.evaluateTeams(env, eval_teams)[0]
 
     def formTeams(self, population, for_evaluation: bool = False) -> list[Team]:
         # Start a list of teams
@@ -244,10 +245,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 agents = self.getBestAgents(population)
             else:
                 # Get agents in this row of subpopulations
-                agents = [
-                    Agent(idx=idx, parameters=subpop[i])
-                    for idx, subpop in enumerate(population)
-                ]
+                agents = [subpop[i] for subpop in population]
 
             # Put the i'th individual on the team if it is inside our team combinations
             for combination in self.team_combinations:
@@ -280,9 +278,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Load in the weights
         for i, team in enumerate(teams):
             for agent_nn, individual in zip(joint_policies[i], team.individuals):
-                agent_nn.set_params(
-                    torch.from_numpy(individual.parameters).to(self.device)
-                )
+                agent_nn.set_params(torch.from_numpy(individual).to(self.device))
 
         # Get initial observations per agent
         observations = env.reset()
@@ -416,6 +412,25 @@ class CooperativeCoevolutionaryAlgorithm:
             size=np.shape(individual),
         )
 
+        # for i, size in enumerate(self.nn_template.size_per_layer):
+        #     if i == 0:
+        #         individual[0:size] += np.random.normal(
+        #             loc=self.config["ccea"]["mutation"]["mean"],
+        #             scale=self.std_dev_list[self.gen],
+        #             size=np.shape(individual),
+        #         )
+        #     else:
+        #         individual[
+        #             self.nn_template.size_per_layer[
+        #                 i - 1
+        #             ] : self.nn_template.size_per_layer[i - 1]
+        #             + size
+        #         ] += np.random.normal(
+        #             loc=self.config["ccea"]["mutation"]["mean"],
+        #             scale=self.std_dev_list[self.gen],
+        #             size=np.shape(individual),
+        #         )
+
     def mutate(self, population):
         # Don't mutate the elites
         for n_individual in range(self.n_mutants):
@@ -487,16 +502,57 @@ class CooperativeCoevolutionaryAlgorithm:
         self,
         fitness_critics,
         eval_infos: list[EvalInfo],
+        hof_eval_info: EvalInfo,
     ):
-        # Assign D
-        for eval_info in eval_infos:
-            for individual, combo_idx in zip(
-                eval_info.team.individuals,
-                eval_info.team.combination,
-            ):
-                individual.parameters.fitness.values = (
-                    eval_info.agent_fitnesses[combo_idx],
+
+        match (self.fitness_shaping_method):
+            case "hof_difference":
+
+                env = create_env(
+                    self.config_dir,
+                    n_envs=self.subpop_size * self.n_agents,
+                    device=self.device,
                 )
+
+                mod_hof_teams = []
+                mod_idx_hof_teams = []
+
+                for eval_info in eval_infos:
+                    for individual, combo_idx in zip(
+                        eval_info.team.individuals,
+                        eval_info.team.combination,
+                    ):
+                        hof_eval_info_copy = deepcopy(hof_eval_info)
+
+                        hof_eval_info_copy.team.individuals[combo_idx] = individual
+
+                        mod_hof_teams.append(hof_eval_info_copy.team)
+                        mod_idx_hof_teams.append(combo_idx)
+
+                mod_hof_eval_infos = self.evaluateTeams(
+                    env,
+                    mod_hof_teams,
+                )
+
+                for mod_idx, mod_hof_eval_info in zip(
+                    mod_idx_hof_teams, mod_hof_eval_infos
+                ):
+
+                    d_hof = mod_hof_eval_info.team_fitness - hof_eval_info.team_fitness
+
+                    mod_hof_eval_info.team.individuals[mod_idx].fitness.values = (
+                        (1 - self.alpha) * eval_info.agent_fitnesses[combo_idx]
+                        + self.alpha * d_hof,
+                    )
+            case "difference":
+                for eval_info in eval_infos:
+                    for individual, combo_idx in zip(
+                        eval_info.team.individuals,
+                        eval_info.team.combination,
+                    ):
+                        individual.fitness.values = (
+                            eval_info.agent_fitnesses[combo_idx],
+                        )
 
     def setPopulation(self, population, offspring):
         for subpop, subpop_offspring in zip(population, offspring):
@@ -509,15 +565,14 @@ class CooperativeCoevolutionaryAlgorithm:
             writer = csv.writer(csvfile)
             writer.writerows([header])
 
-    def writeEvalFitnessCSV(self, eval_fit_dir, eval_infos):
+    def writeEvalFitnessCSV(self, eval_fit_dir, eval_info):
 
-        team_fitnesses = [eval_info.team_fitness for eval_info in eval_infos]
+        team_fitnesses = eval_info.team_fitness
 
         # Now save it all to the csv
         with open(eval_fit_dir, "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            for _ in eval_infos:
-                writer.writerow([self.gen, *team_fitnesses])
+            writer.writerow([self.gen, team_fitnesses])
 
     def init_fitness_critics(self):
         # Initialize fitness critics
@@ -548,6 +603,21 @@ class CooperativeCoevolutionaryAlgorithm:
             ]
 
         return fc
+
+    def select_hof_team(self, eval_infos: list[EvalInfo], hof_eval_info: EvalInfo):
+
+        hof_eval_infos = [
+            eval_info
+            for eval_info in eval_infos
+            if eval_info.team_fitness > hof_eval_info.team_fitness
+        ]
+
+        if hof_eval_infos:
+            new_hol_eval_info = max(hof_eval_infos, key=lambda item: item.team_fitness)
+        else:
+            new_hol_eval_info = hof_eval_info
+
+        return new_hol_eval_info
 
     def run(self):
 
@@ -611,6 +681,8 @@ class CooperativeCoevolutionaryAlgorithm:
         # Create environment
         env = create_env(self.config_dir, n_envs=self.subpop_size, device=self.device)
 
+        hof_eval_info = self.evaluateBestTeam(pop)
+
         for n_gen in range(self.n_gens + 1):
 
             # Set gen counter global var
@@ -642,16 +714,22 @@ class CooperativeCoevolutionaryAlgorithm:
                 # self.writeFitCritLossCSV(trial_dir, fc_loss)
 
             # Now assign fitnesses to each individual
-            self.assignFitnesses(fitness_critics, eval_infos)
+            self.assignFitnesses(fitness_critics, eval_infos, hof_eval_info)
+
+            # Select new hof team
+            hof_eval_info = self.select_hof_team(eval_infos, hof_eval_info)
+
+            # Update alpha
+            self.alpha += self.alpha_max / (0.8 * self.n_gens)
 
             # Evaluate a team with the best individual from each subpopulation
-            eval_infos = self.evaluateBestTeam(offspring)
+            best_team_eval_info = self.evaluateBestTeam(offspring)
 
             # Now populate the population with individuals from the offspring
             self.setPopulation(pop, offspring)
 
             # Save fitnesses
-            self.writeEvalFitnessCSV(eval_fit_dir, eval_infos)
+            self.writeEvalFitnessCSV(eval_fit_dir, best_team_eval_info)
 
             # Save trajectories and checkpoint
             if n_gen % self.n_gens_between_save == 0:
@@ -660,7 +738,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 with open(os.path.join(trial_dir, "checkpoint.pickle"), "wb") as handle:
                     pickle.dump(
                         {
-                            "best_team": eval_infos[0].team,
+                            "best_team": best_team_eval_info.team,
                             "population": pop,
                             "gen": n_gen,
                             "fitness_critics": (
