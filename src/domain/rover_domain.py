@@ -31,6 +31,8 @@ class RoverDomain(BaseScenario):
         self.n_agents = kwargs.pop("n_agents", 5)
         self.n_targets = kwargs.pop("n_targets", 7)
         self.targets_positions = kwargs.pop("targets_positions", [])
+        self.targets_orders = kwargs.pop("targets_orders", [])
+        self.targets_types = kwargs.pop("targets_types", [])
         self.targets_values = torch.tensor(
             kwargs.pop("targets_values", []), device=device
         )
@@ -77,6 +79,8 @@ class RoverDomain(BaseScenario):
                 color=self.target_color,
             )
             target.value = self.targets_values[i]
+            target.type = self.targets_types[i]
+            target.order = self.targets_orders[i]
 
             world.add_landmark(target)
             self._targets.append(target)
@@ -92,8 +96,11 @@ class RoverDomain(BaseScenario):
             agent.difference_rew = torch.zeros(batch_dim, device=device)
             world.add_agent(agent)
 
-        self.covered_targets = torch.zeros(batch_dim, self.n_targets, device=device)
         self.global_rew = torch.zeros(batch_dim, device=device)
+        self.covered_targets = torch.zeros((batch_dim, self.n_targets), device=device)
+        self.order_mask = torch.zeros(
+            (batch_dim, self.n_agents, self.n_targets), device=device
+        ).to(torch.bool)
 
         return world
 
@@ -140,130 +147,134 @@ class RoverDomain(BaseScenario):
                     batch_index=env_index,
                 )
 
+    def calculate_global_reward(self, targets_pos, agent: Agent):
+
+        agents_pos = torch.stack([a.state.pos for a in self.world.agents], dim=1)
+
+        agents_targets_dists = torch.cdist(agents_pos, targets_pos)
+        agents_per_target = torch.sum(
+            (agents_targets_dists < self._covering_range).type(torch.int),
+            dim=1,
+        )
+
+        self.covered_targets = agents_per_target >= self._agents_per_target
+
+        agents_covering_targets_mask = agents_targets_dists < self._covering_range
+
+        targets_observed_in_order_per_agent = (
+            agents_covering_targets_mask * self.order_mask
+        )
+
+        covered_targets_dists = agents_covering_targets_mask * agents_targets_dists
+
+        masked_covered_targets_dists = torch.where(
+            covered_targets_dists == 0, float("inf"), covered_targets_dists
+        )
+
+        min_covered_targets_dists, _ = torch.min(masked_covered_targets_dists, dim=1)
+
+        min_covered_targets_dists = torch.clamp(min_covered_targets_dists, min=1e-2)
+
+        min_covered_targets_dists[torch.isinf(min_covered_targets_dists)] = 0
+
+        global_reward_spread = torch.log10(
+            self.covered_targets / min_covered_targets_dists
+        )
+
+        global_reward_spread *= self.targets_values
+
+        global_reward_spread[torch.isnan(global_reward_spread)] = 0
+        global_reward_spread[torch.isinf(global_reward_spread)] = 0
+
+        return torch.sum(
+            global_reward_spread,
+            dim=1,
+        )
+
+    def calculate_difference_reward(self, targets_pos, me: Agent):
+
+        global_rew_without_me = torch.zeros(
+            self.world.batch_dim, device=self.world.device
+        )
+
+        me.difference_rew[:] = 0
+
+        agents_without_me = [agent for agent in self.world.agents if agent != me]
+
+        agents_pos_without_me = torch.stack(
+            [a.state.pos for a in agents_without_me], dim=1
+        )
+
+        agents_targets_dists_without_me = torch.cdist(
+            agents_pos_without_me, targets_pos
+        )
+
+        agents_per_target_without_me = torch.sum(
+            (agents_targets_dists_without_me < self._covering_range).type(torch.int),
+            dim=1,
+        )
+
+        covered_targets_without_me = (
+            agents_per_target_without_me >= self._agents_per_target
+        )
+
+        covered_targets_mask = agents_targets_dists_without_me < self._covering_range
+
+        covered_targets_dists_without_me = (
+            covered_targets_mask * agents_targets_dists_without_me
+        )
+
+        masked_covered_targets_dists_without_me = torch.where(
+            covered_targets_dists_without_me == 0,
+            float("inf"),
+            covered_targets_dists_without_me,
+        )
+
+        min_covered_targets_dists_without_me, _ = torch.min(
+            masked_covered_targets_dists_without_me, dim=1
+        )
+
+        min_covered_targets_dists_without_me = torch.clamp(
+            min_covered_targets_dists_without_me, min=1e-2
+        )
+
+        min_covered_targets_dists_without_me[
+            torch.isinf(min_covered_targets_dists_without_me)
+        ] = 0
+
+        global_reward_spread = torch.log10(
+            covered_targets_without_me / min_covered_targets_dists_without_me
+        )
+
+        global_reward_spread *= self.targets_values
+
+        global_reward_spread[torch.isnan(global_reward_spread)] = 0
+        global_reward_spread[torch.isinf(global_reward_spread)] = 0
+
+        global_rew_without_me = torch.sum(global_reward_spread, dim=1)
+
+        return self.global_rew - global_rew_without_me
+
     def reward(self, agent: Agent):
         is_first = agent == self.world.agents[0]
         is_last = agent == self.world.agents[-1]
 
         if is_first:
-            # Calculate G
-            agents_pos = torch.stack([a.state.pos for a in self.world.agents], dim=1)
+
             targets_pos = torch.stack([t.state.pos for t in self._targets], dim=1)
-            agents_targets_dists = torch.cdist(agents_pos, targets_pos)
-            agents_per_target = torch.sum(
-                (agents_targets_dists < self._covering_range).type(torch.int),
-                dim=1,
-            )
 
-            self.covered_targets = agents_per_target >= self._agents_per_target
-
-            covered_targets_mask = agents_targets_dists < self._covering_range
-
-            covered_targets_dists = covered_targets_mask * agents_targets_dists
-
-            masked_covered_targets_dists = torch.where(
-                covered_targets_dists == 0, float("inf"), covered_targets_dists
-            )
-
-            min_covered_targets_dists, _ = torch.min(
-                masked_covered_targets_dists, dim=1
-            )
-
-            min_covered_targets_dists = torch.clamp(min_covered_targets_dists, min=1e-2)
-
-            min_covered_targets_dists[torch.isinf(min_covered_targets_dists)] = 0
-
-            global_reward_spread = torch.log10(
-                self.covered_targets / min_covered_targets_dists
-            )
-
-            global_reward_spread *= self.targets_values
-
-            global_reward_spread[torch.isnan(global_reward_spread)] = 0
-            global_reward_spread[torch.isinf(global_reward_spread)] = 0
-
-            self.global_rew = torch.sum(
-                global_reward_spread,
-                dim=1,
-            )
+            # Calculate G
+            self.global_rew = self.calculate_global_reward(targets_pos, agent)
 
             # Calculate D
-            global_rew_without_me = torch.zeros(
-                self.world.batch_dim, device=self.world.device
-            )
             for me in self.world.agents:
-                global_rew_without_me[:] = 0
-                me.difference_rew[:] = 0
-
-                agents_without_me = [
-                    agent for agent in self.world.agents if agent != me
-                ]
-
-                agents_pos_without_me = torch.stack(
-                    [a.state.pos for a in agents_without_me], dim=1
-                )
-
-                agents_targets_dists_without_me = torch.cdist(
-                    agents_pos_without_me, targets_pos
-                )
-
-                agents_per_target_without_me = torch.sum(
-                    (agents_targets_dists_without_me < self._covering_range).type(
-                        torch.int
-                    ),
-                    dim=1,
-                )
-
-                covered_targets_without_me = (
-                    agents_per_target_without_me >= self._agents_per_target
-                )
-
-                covered_targets_mask = (
-                    agents_targets_dists_without_me < self._covering_range
-                )
-
-                covered_targets_dists_without_me = (
-                    covered_targets_mask * agents_targets_dists_without_me
-                )
-
-                masked_covered_targets_dists_without_me = torch.where(
-                    covered_targets_dists_without_me == 0,
-                    float("inf"),
-                    covered_targets_dists_without_me,
-                )
-
-                min_covered_targets_dists_without_me, _ = torch.min(
-                    masked_covered_targets_dists_without_me, dim=1
-                )
-
-                min_covered_targets_dists_without_me = torch.clamp(
-                    min_covered_targets_dists_without_me, min=1e-2
-                )
-
-                min_covered_targets_dists_without_me[
-                    torch.isinf(min_covered_targets_dists_without_me)
-                ] = 0
-
-                global_reward_spread = torch.log10(
-                    covered_targets_without_me / min_covered_targets_dists_without_me
-                )
-
-                global_reward_spread *= self.targets_values
-
-                global_reward_spread[torch.isnan(global_reward_spread)] = 0
-                global_reward_spread[torch.isinf(global_reward_spread)] = 0
-
-                global_rew_without_me = torch.sum(global_reward_spread, dim=1)
-
-                me.difference_rew = self.global_rew - global_rew_without_me
+                me.difference_rew = self.calculate_difference_reward(targets_pos, me)
 
         if is_last:
             self.all_time_covered_targets += self.covered_targets
 
-            # # Make targets dissapear once taken
-            # for i, target in enumerate(self._targets):
-            #     target.state.pos[self.covered_targets[:, i]] = self.get_outside_pos(
-            #         None
-            #     )[self.covered_targets[:, i]]
+            for i, target in enumerate(self._targets):
+                targets_per_env = self.all_time_covered_targets[:, i]
 
         covering_rew = torch.cat([self.global_rew, agent.difference_rew])
 
@@ -278,27 +289,6 @@ class RoverDomain(BaseScenario):
             ),
             device=self.world.device,
         ).uniform_(-1000 * self.world.x_semidim, -10 * self.world.x_semidim)
-
-    def agent_reward(self, agent, agents_targets_dists):
-        agent_index = self.world.agents.index(agent)
-
-        covering_reward = torch.zeros(self.world.batch_dim, device=self.world.device)
-
-        targets_covered_by_agent = (
-            agents_targets_dists[:, agent_index] < self._covering_range
-        )
-
-        # dists_to_covered_targets = (targets_covered_by_agent * self.agents_targets_dists[:, agent_index])
-
-        num_covered_targets_covered_by_agent = (
-            targets_covered_by_agent * self.covered_targets
-        ).sum(dim=-1)
-
-        covering_reward += (
-            num_covered_targets_covered_by_agent * self.covering_rew_coeff
-        )
-
-        return covering_reward
 
     def observation(self, agent: Agent):
 

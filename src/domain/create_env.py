@@ -26,6 +26,8 @@ def create_env(config_dir, n_envs: int, device: str) -> Environment:
     n_pois = len(config["env"]["pois"])
     poi_positions = [poi["position"]["fixed"] for poi in config["env"]["pois"]]
     poi_values = [poi["value"] for poi in config["env"]["pois"]]
+    poi_types = [poi["type"] for poi in config["env"]["pois"]]
+    poi_orders = [poi["order"] for poi in config["env"]["pois"]]
     coupling = [poi["coupling"] for poi in config["env"]["pois"]]
     obs_radius = [poi["observation_radius"] for poi in config["env"]["pois"]]
 
@@ -46,6 +48,8 @@ def create_env(config_dir, n_envs: int, device: str) -> Environment:
         agents_per_target=coupling[0],
         covering_range=obs_radius[0],
         lidar_range=lidar_range[0],
+        targets_types=poi_types,
+        targets_orders=poi_orders,
     )
 
     return env
