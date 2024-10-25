@@ -221,13 +221,13 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return best_agents
 
-    def evaluateBestTeam(self, population):
-        # Create evaluation teams
-        eval_teams = self.formTeams(population, for_evaluation=True)
+    def evaluateBestTeam(self, eval_infos):
+        best_eval_info = max(eval_infos, key=lambda item: item.team_fitness)
+
         # Create one env
         env = create_env(self.config_dir, n_envs=1, device=self.device)
 
-        return self.evaluateTeams(env, eval_teams)[0]
+        return self.evaluateTeams(env, [best_eval_info.team])[0]
 
     def formTeams(self, population, for_evaluation: bool = False) -> list[Team]:
         # Start a list of teams
@@ -606,14 +606,10 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def select_hof_team(self, eval_infos: list[EvalInfo], hof_eval_info: EvalInfo):
 
-        hof_eval_infos = [
-            eval_info
-            for eval_info in eval_infos
-            if eval_info.team_fitness > hof_eval_info.team_fitness
-        ]
+        best_eval_info = max(eval_infos, key=lambda item: item.team_fitness)
 
-        if hof_eval_infos:
-            new_hol_eval_info = max(hof_eval_infos, key=lambda item: item.team_fitness)
+        if best_eval_info.team_fitness > hof_eval_info.team_fitness:
+            new_hol_eval_info = best_eval_info
         else:
             new_hol_eval_info = hof_eval_info
 
@@ -678,10 +674,15 @@ class CooperativeCoevolutionaryAlgorithm:
             else:
                 fitness_critics = None
 
+        # Create environment for hof team
+        env = create_env(self.config_dir, n_envs=1, device=self.device)
+
+        hof_team = self.formTeams(pop, for_evaluation=True)
+
+        hof_eval_info = self.evaluateTeams(env, hof_team)[0]
+
         # Create environment
         env = create_env(self.config_dir, n_envs=self.subpop_size, device=self.device)
-
-        hof_eval_info = self.evaluateBestTeam(pop)
 
         for n_gen in range(self.n_gens + 1):
 
@@ -722,8 +723,8 @@ class CooperativeCoevolutionaryAlgorithm:
             # Update alpha
             self.alpha += self.alpha_max / (0.8 * self.n_gens)
 
-            # Evaluate a team with the best individual from each subpopulation
-            best_team_eval_info = self.evaluateBestTeam(offspring)
+            # Evaluate best team of generation
+            best_team_eval_info = self.evaluateBestTeam(eval_infos)
 
             # Now populate the population with individuals from the offspring
             self.setPopulation(pop, offspring)
@@ -739,6 +740,7 @@ class CooperativeCoevolutionaryAlgorithm:
                     pickle.dump(
                         {
                             "best_team": best_team_eval_info.team,
+                            "hof_team": hof_eval_info.team,
                             "population": pop,
                             "gen": n_gen,
                             "fitness_critics": (
