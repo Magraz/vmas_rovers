@@ -20,9 +20,12 @@ class GRU_Policy(nn.Module):  # inheriting from nn.Module!
         self.output = nn.Linear(hidden_size, output_size, dtype=torch.double)
         self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]
 
+        # Disable gradient calcs
+        for p in self.parameters():
+            p.requires_grad_(False)
+
     def forward(self, x: torch.Tensor):
-        self.rnn.flatten_parameters()
-        _, hn = self.rnn(x)
+        _, hn = self.rnn(x.unsqueeze(0))
         out = self.output(hn)
         return F.tanh(out)
 

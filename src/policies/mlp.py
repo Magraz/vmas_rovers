@@ -41,7 +41,7 @@ class MLP_Policy(nn.Module):  # inheriting from nn.Module!
             p.requires_grad_(False)
 
     def forward(self, x: torch.Tensor):
-        out = F.leaky_relu(self.fc1(x))
+        out = F.leaky_relu(self.fc1(x.unsqueeze(0)))
 
         match (self.hidden_layers):
             case 2:
