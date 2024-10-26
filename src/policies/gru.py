@@ -36,15 +36,19 @@ class GRU_Policy(nn.Module):  # inheriting from nn.Module!
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = GRU_Policy(input_size=8, hidden_size=36, output_size=2, n_layers=1).to(device)
+    model = GRU_Policy(input_size=8, hidden_size=17, output_size=2, n_layers=1).to(
+        device
+    )
     model_copy = deepcopy(model)
 
     torch.set_printoptions(threshold=10_000)
     print(model_copy.num_params)
 
-    print(model_copy.get_params())
+    # print(model_copy.get_params())
 
-    input = torch.tensor([[-1, -1, -1, -1, -1, -1, -1, -1]], dtype=torch.double).to(device)
+    input = torch.tensor([[-1, -1, -1, -1, -1, -1, -1, -1]], dtype=torch.double).to(
+        device
+    )
     print(model_copy.forward(input))
 
     rand_params = torch.rand(model_copy.get_params().size()).to(device)

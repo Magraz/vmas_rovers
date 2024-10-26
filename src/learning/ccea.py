@@ -191,7 +191,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             case "GRU":
                 agent_nn = GRU_Policy(
-                    input_size=36,
+                    input_size=self.observation_size,
                     hidden_size=self.policy_n_hidden[0],
                     output_size=self.action_size,
                     n_layers=1,
