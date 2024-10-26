@@ -10,9 +10,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hpc", default=False, help="use hpc config files", action="store_true"
     )
-    parser.add_argument(
-        "--load_checkpoint", default=False, help="loads checkpoint", action="store_true"
-    )
     parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
     parser.add_argument("--model", default="mlp", help="mlp/gru/cnn/att", type=str)
     parser.add_argument(
@@ -45,5 +42,4 @@ if __name__ == "__main__":
         config_dir=config_dir,
         experiment_name=experiment_name,
         trial_id=args["trial_id"],
-        load_checkpoint=args["load_checkpoint"],
     )

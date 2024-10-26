@@ -70,9 +70,7 @@ class EvalInfo(object):
 
 
 class CooperativeCoevolutionaryAlgorithm:
-    def __init__(
-        self, config_dir, experiment_name: str, trial_id: int, load_checkpoint: bool
-    ):
+    def __init__(self, config_dir, experiment_name: str, trial_id: int):
 
         self.trial_id = trial_id
         self.video_name = f"{experiment_name}_{trial_id}"
@@ -149,9 +147,6 @@ class CooperativeCoevolutionaryAlgorithm:
         self.alpha_max = 0.5
 
         self.nn_template = self.generateTemplateNN()
-
-        # Data loading
-        self.load_checkpoint = load_checkpoint
 
         # Data saving variables
         self.n_gens_between_save = self.config["data"]["n_gens_between_save"]
@@ -630,8 +625,8 @@ class CooperativeCoevolutionaryAlgorithm:
             os.makedirs(trial_dir)
 
         # Load checkpoint
-        if self.load_checkpoint:
-
+        checkpoint_exists = Path(checkpoint_name).is_file()
+        if checkpoint_exists:
             with open(checkpoint_name, "rb") as handle:
                 checkpoint = pickle.load(handle)
                 pop = checkpoint["population"]
@@ -692,7 +687,7 @@ class CooperativeCoevolutionaryAlgorithm:
             self.gen = n_gen
 
             # Get loading bar up to checkpoint
-            if self.load_checkpoint and n_gen <= self.checkpoint_gen:
+            if checkpoint_exists and n_gen <= self.checkpoint_gen:
                 continue
 
             # Perform selection
@@ -756,8 +751,6 @@ class CooperativeCoevolutionaryAlgorithm:
                     )
 
 
-def runCCEA(config_dir, experiment_name: str, trial_id: int, load_checkpoint: bool):
-    ccea = CooperativeCoevolutionaryAlgorithm(
-        config_dir, experiment_name, trial_id, load_checkpoint
-    )
+def runCCEA(config_dir, experiment_name: str, trial_id: int):
+    ccea = CooperativeCoevolutionaryAlgorithm(config_dir, experiment_name, trial_id)
     return ccea.run()
