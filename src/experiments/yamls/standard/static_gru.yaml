@@ -14,7 +14,7 @@ env:
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
-
+    
     - observation_radius: 1
       type: 0
       position:
@@ -26,7 +26,7 @@ env:
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
-
+          
   pois:
     - value: 4.0
       coupling: 2
@@ -82,8 +82,8 @@ ccea:
   fitness_shaping: hof_difference #global/difference/
 
   policy:
-    type: MLP
-    hidden_layers: [32, 32]
+    type: GRU
+    hidden_layers: [17]
     rover_max_velocity: 1.0
 
   population:

@@ -90,4 +90,4 @@ ccea:
   n_gens: 5000
 
 data:
-  n_gens_between_save: 50
+  n_gens_between_save: 20
