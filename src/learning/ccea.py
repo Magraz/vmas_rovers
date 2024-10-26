@@ -218,14 +218,6 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return best_agents
 
-    def evaluateBestTeam(self, eval_infos):
-        best_eval_info = max(eval_infos, key=lambda item: item.team_fitness)
-
-        # Create one env
-        env = create_env(self.config_dir, n_envs=1, device=self.device)
-
-        return self.evaluateTeams(env, [best_eval_info.team])[0]
-
     def formTeams(self, population, for_evaluation: bool = False) -> list[Team]:
         # Start a list of teams
         teams = []
@@ -562,9 +554,9 @@ class CooperativeCoevolutionaryAlgorithm:
             writer = csv.writer(csvfile)
             writer.writerows([header])
 
-    def writeEvalFitnessCSV(self, eval_fit_dir, eval_info):
+    def writeEvalFitnessCSV(self, eval_fit_dir, best_fitness):
 
-        team_fitnesses = eval_info.team_fitness
+        team_fitnesses = best_fitness
 
         # Now save it all to the csv
         with open(eval_fit_dir, "a", newline="") as csvfile:
@@ -721,17 +713,16 @@ class CooperativeCoevolutionaryAlgorithm:
             self.alpha += self.alpha_max / (0.8 * self.n_gens)
 
             # Evaluate best team of generation
-            best_team_eval_info = self.evaluateBestTeam(eval_infos)
+            best_team_eval_info = max(eval_infos, key=lambda item: item.team_fitness)
 
             # Now populate the population with individuals from the offspring
             self.setPopulation(pop, offspring)
 
             # Save fitnesses
-            self.writeEvalFitnessCSV(eval_fit_dir, best_team_eval_info)
+            self.writeEvalFitnessCSV(eval_fit_dir, best_team_eval_info.team_fitness)
 
             # Save trajectories and checkpoint
             if n_gen % self.n_gens_between_save == 0:
-
                 # Save checkpoint
                 with open(os.path.join(trial_dir, "checkpoint.pickle"), "wb") as handle:
                     pickle.dump(
