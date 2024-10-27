@@ -81,6 +81,8 @@ ccea:
 
   fitness_shaping: hof_difference #global/difference/
 
+  selection: epsilon #epsilon/binary
+
   policy:
     type: GRU
     hidden_layers: [17]

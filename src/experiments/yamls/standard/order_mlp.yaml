@@ -69,6 +69,8 @@ ccea:
 
   fitness_shaping: hof_difference #global/difference/
 
+  selection: epsilon #epsilon/binary
+
   policy:
     type: MLP
     hidden_layers: [32, 32]

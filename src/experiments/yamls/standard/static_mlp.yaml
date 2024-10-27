@@ -81,6 +81,8 @@ ccea:
 
   fitness_shaping: hof_difference #global/difference/
 
+  selection: epsilon #epsilon/binary/tournament
+
   policy:
     type: MLP
     hidden_layers: [32, 32]
@@ -90,7 +92,6 @@ ccea:
     subpopulation_size: 50
 
   evaluation:
-    n_evaluations: 1
     fitness_calculation: last_step #aggregate/last_step
 
   mutation:

@@ -103,8 +103,6 @@ class CooperativeCoevolutionaryAlgorithm:
         self.use_fc = self.config["fitness_critic"]["use_fit_crit"]
         self.fit_crit_loss_type = self.config["fitness_critic"]["loss_type"]
 
-        self.n_eval_per_team = self.config["ccea"]["evaluation"]["n_evaluations"]
-
         self.team_size = (
             self.config["teaming"]["team_size"] if self.use_teaming else self.n_agents
         )
@@ -130,6 +128,8 @@ class CooperativeCoevolutionaryAlgorithm:
         ]
 
         self.n_gens = self.config["ccea"]["n_gens"]
+
+        self.selection_method = self.config["ccea"]["selection"]
 
         self.std_dev_list = np.arange(
             start=self.config["ccea"]["mutation"]["max_std_deviation"],
@@ -218,36 +218,25 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return best_agents
 
-    def formTeams(self, population, for_evaluation: bool = False) -> list[Team]:
+    def formTeams(self, population, joint_policies: int) -> list[Team]:
         # Start a list of teams
         teams = []
-
-        if for_evaluation:
-            joint_policies = 1
-        else:
-            joint_policies = self.subpop_size
 
         # For each row in the population of subpops (grabs an individual from each row in the subpops)
         for i in range(joint_policies):
 
-            if for_evaluation:
-                agents = self.getBestAgents(population)
-            else:
-                # Get agents in this row of subpopulations
-                agents = [subpop[i] for subpop in population]
+            # Get agents in this row of subpopulations
+            agents = [subpop[i] for subpop in population]
 
             # Put the i'th individual on the team if it is inside our team combinations
             for combination in self.team_combinations:
 
-                teams.extend(
-                    [
-                        Team(
-                            idx=i,
-                            individuals=[agents[idx] for idx in combination],
-                            combination=combination,
-                        )
-                        for _ in range(self.n_eval_per_team)
-                    ]
+                teams.append(
+                    Team(
+                        idx=i,
+                        individuals=[agents[idx] for idx in combination],
+                        combination=combination,
+                    )
                 )
 
         return teams
@@ -448,8 +437,42 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return chosen_ones
 
+    def epsilonGreedySelection(
+        self,
+        individuals,
+        k: int,
+        epsilon: float,
+        fit_attr: str = "fitness",
+    ):
+
+        chosen_ones = []
+
+        individuals_copy = individuals[:]
+
+        for _ in range(k):
+            if np.random.choice([True, False], 1, p=[1 - epsilon, epsilon]):
+                chosen_one = max(individuals_copy, key=attrgetter(fit_attr))
+                individuals_copy.remove(chosen_one)
+            else:
+                chosen_one = random.choice(individuals)
+
+            chosen_ones.append(chosen_one)
+
+        return sorted(chosen_ones, key=attrgetter(fit_attr), reverse=True)
+
     def selectSubPopulation(self, subpopulation):
-        chosen_ones = self.binarySelection(subpopulation, tournsize=2)
+
+        match (self.selection_method):
+            case "binary":
+                chosen_ones = self.binarySelection(subpopulation, tournsize=2)
+            case "epsilon":
+                chosen_ones = self.epsilonGreedySelection(
+                    subpopulation, self.subpop_size // 2, epsilon=0.1
+                )
+            case "tournament":
+                chosen_ones = tools.selTournament(
+                    subpopulation, self.subpop_size // 2, 2
+                )
 
         offspring = chosen_ones + chosen_ones
 
@@ -495,6 +518,10 @@ class CooperativeCoevolutionaryAlgorithm:
     ):
 
         match (self.fitness_shaping_method):
+            case "global":
+                for eval_info in eval_infos:
+                    for individual in eval_info.team.individuals:
+                        individual.fitness.values = (eval_info.team_fitness,)
             case "hof_difference":
 
                 env = create_env(
@@ -548,20 +575,18 @@ class CooperativeCoevolutionaryAlgorithm:
             subpop[:] = subpop_offspring
 
     def createEvalFitnessCSV(self, eval_fit_dir):
-        header = ["gen", "team_fitness"]
+        header = ["gen", "avg_team_fitness", "best_team_fitness"]
 
         with open(eval_fit_dir, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerows([header])
 
-    def writeEvalFitnessCSV(self, eval_fit_dir, best_fitness):
-
-        team_fitnesses = best_fitness
+    def writeEvalFitnessCSV(self, eval_fit_dir, avg_fitness, best_fitness):
 
         # Now save it all to the csv
         with open(eval_fit_dir, "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow([self.gen, team_fitnesses])
+            writer.writerow([self.gen, avg_fitness, best_fitness])
 
     def init_fitness_critics(self):
         # Initialize fitness critics
@@ -666,7 +691,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Create environment for hof team
         env = create_env(self.config_dir, n_envs=1, device=self.device)
 
-        hof_team = self.formTeams(pop, for_evaluation=True)
+        hof_team = self.formTeams(pop, joint_policies=1)
 
         hof_eval_info = self.evaluateTeams(env, hof_team)[0]
 
@@ -693,7 +718,7 @@ class CooperativeCoevolutionaryAlgorithm:
             self.shuffle(offspring)
 
             # Form teams for evaluation
-            teams = self.formTeams(offspring)
+            teams = self.formTeams(offspring, joint_policies=self.subpop_size)
 
             # Evaluate each team
             eval_infos = self.evaluateTeams(env, teams)
@@ -713,16 +738,23 @@ class CooperativeCoevolutionaryAlgorithm:
             self.alpha += self.alpha_max / (0.8 * self.n_gens)
 
             # Evaluate best team of generation
+            avg_team_fitness = (
+                sum([eval_info.team_fitness for eval_info in eval_infos])
+                / self.subpop_size
+            )
             best_team_eval_info = max(eval_infos, key=lambda item: item.team_fitness)
 
             # Now populate the population with individuals from the offspring
             self.setPopulation(pop, offspring)
 
             # Save fitnesses
-            self.writeEvalFitnessCSV(eval_fit_dir, best_team_eval_info.team_fitness)
+            self.writeEvalFitnessCSV(
+                eval_fit_dir, avg_team_fitness, best_team_eval_info.team_fitness
+            )
 
             # Save trajectories and checkpoint
             if n_gen % self.n_gens_between_save == 0:
+
                 # Save checkpoint
                 with open(os.path.join(trial_dir, "checkpoint.pickle"), "wb") as handle:
                     pickle.dump(

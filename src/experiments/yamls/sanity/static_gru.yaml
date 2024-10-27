@@ -67,7 +67,9 @@ ccea:
 
   weight_initialization: kaiming
 
-  fitness_shaping: hof_difference #global/difference/
+  fitness_shaping: difference #global/difference/
+
+  selection: epsilon #epsilon/binary
 
   policy:
     type: GRU
