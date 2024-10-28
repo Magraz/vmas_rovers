@@ -73,7 +73,7 @@ ccea:
 
   policy:
     type: MLP
-    hidden_layers: [32]
+    hidden_layers: [12, 12]
     rover_max_velocity: 1.0
 
   population:
