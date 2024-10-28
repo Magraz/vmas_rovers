@@ -289,7 +289,7 @@ class CooperativeCoevolutionaryAlgorithm:
         frame_list = []
 
         # Start evaluation
-        for _ in range(self.n_steps):
+        for step in range(self.n_steps):
 
             stacked_obs = torch.stack(observations, -1)
 

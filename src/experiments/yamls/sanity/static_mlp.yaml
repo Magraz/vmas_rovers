@@ -88,7 +88,7 @@ ccea:
     max_std_deviation: 0.1
 
   n_steps: 60
-  n_gens: 1000
+  n_gens: 500
 
 data:
   n_gens_between_save: 20
