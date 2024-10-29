@@ -14,6 +14,7 @@ from policies.cnn import CNN_Policy
 
 from fitness_critic.fitness_critic import FitnessCritic
 from domain.create_env import create_env
+from learning.selection import binarySelection, epsilonGreedySelection, softmaxSelection
 
 from copy import deepcopy
 import numpy as np
@@ -390,25 +391,6 @@ class CooperativeCoevolutionaryAlgorithm:
             size=np.shape(individual),
         )
 
-        # for i, size in enumerate(self.nn_template.size_per_layer):
-        #     if i == 0:
-        #         individual[0:size] += np.random.normal(
-        #             loc=self.config["ccea"]["mutation"]["mean"],
-        #             scale=self.std_dev_list[self.gen],
-        #             size=np.shape(individual),
-        #         )
-        #     else:
-        #         individual[
-        #             self.nn_template.size_per_layer[
-        #                 i - 1
-        #             ] : self.nn_template.size_per_layer[i - 1]
-        #             + size
-        #         ] += np.random.normal(
-        #             loc=self.config["ccea"]["mutation"]["mean"],
-        #             scale=self.std_dev_list[self.gen],
-        #             size=np.shape(individual),
-        #         )
-
     def mutate(self, population):
         # Don't mutate the elites
         for n_individual in range(self.n_mutants):
@@ -419,56 +401,17 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.mutateIndividual(subpop[mutant_idx])
                 subpop[mutant_idx].fitness.values = (np.float32(0.0),)
 
-    def binarySelection(self, individuals, tournsize: int, fit_attr: str = "fitness"):
-
-        # Shuffle the list randomly
-        random.shuffle(individuals)
-
-        # Create list of random pairs without repetition
-        pairs_of_candidates = [
-            (individuals[i], individuals[i + 1])
-            for i in range(0, len(individuals) - 1, tournsize)
-        ]
-
-        chosen_ones = [
-            max(candidates, key=attrgetter(fit_attr))
-            for candidates in pairs_of_candidates
-        ]
-
-        return chosen_ones
-
-    def epsilonGreedySelection(
-        self,
-        individuals,
-        k: int,
-        epsilon: float,
-        fit_attr: str = "fitness",
-    ):
-
-        chosen_ones = []
-
-        individuals_copy = individuals[:]
-
-        for _ in range(k):
-            if np.random.choice([True, False], 1, p=[1 - epsilon, epsilon]):
-                chosen_one = max(individuals_copy, key=attrgetter(fit_attr))
-                individuals_copy.remove(chosen_one)
-            else:
-                chosen_one = random.choice(individuals)
-
-            chosen_ones.append(chosen_one)
-
-        return sorted(chosen_ones, key=attrgetter(fit_attr), reverse=True)
-
     def selectSubPopulation(self, subpopulation):
 
         match (self.selection_method):
             case "binary":
-                chosen_ones = self.binarySelection(subpopulation, tournsize=2)
+                chosen_ones = binarySelection(subpopulation, tournsize=2)
             case "epsilon":
-                chosen_ones = self.epsilonGreedySelection(
-                    subpopulation, self.subpop_size // 2, epsilon=0.1
+                chosen_ones = epsilonGreedySelection(
+                    subpopulation, self.subpop_size // 2, epsilon=0.3
                 )
+            case "softmax":
+                chosen_ones = softmaxSelection(subpopulation, self.subpop_size // 2)
             case "tournament":
                 chosen_ones = tools.selTournament(
                     subpopulation, self.subpop_size // 2, 2

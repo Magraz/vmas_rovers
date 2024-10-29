@@ -69,7 +69,7 @@ ccea:
 
   fitness_shaping: global #global/difference/hof_difference
 
-  selection: epsilon #epsilon/binary
+  selection: softmax #epsilon/binary/softmax
 
   policy:
     type: MLP
@@ -87,7 +87,7 @@ ccea:
     min_std_deviation: 0.01
     max_std_deviation: 0.1
 
-  n_steps: 60
+  n_steps: 40
   n_gens: 500
 
 data:

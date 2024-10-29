@@ -18,7 +18,7 @@ best_team = None
 
 with open(checkpoint_path, "rb") as handle:
     checkpoint = pickle.load(handle)
-    best_team = checkpoint["hof_team"]
+    best_team = checkpoint["best_team"]
 
 
 ccea = CooperativeCoevolutionaryAlgorithm(config_path, experiment_name, trial)
