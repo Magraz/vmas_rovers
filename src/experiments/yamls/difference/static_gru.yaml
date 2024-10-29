@@ -1,5 +1,5 @@
 env:
-  map_size: [1.0, 1.0]
+  map_size: [2.0, 2.0]
   use_order: False
 
   rovers:
@@ -14,6 +14,18 @@ env:
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
+
+    - observation_radius: 1
+      type: 0
+      position:
+        spawn_rule: fixed
+        fixed: [0.0, 0.0]
+    
+    - observation_radius: 1
+      type: 0
+      position:
+        spawn_rule: fixed
+        fixed: [0.0, 0.0]
     
     - observation_radius: 1
       type: 0
@@ -26,43 +38,81 @@ env:
       position:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
-          
+
   pois:
-    - value: 4.0
+    - value: 1.0
       coupling: 2
       observation_radius: 0.25
       type: 0
       order: 0
       position:
         spawn_rule: fixed
-        fixed: [-0.5, -0.5]
+        fixed: [0.25, 0.5]
+    
+    - value: 1.0
+      coupling: 2
+      observation_radius: 0.25
+      type: 0
+      order: 0
+      position:
+        spawn_rule: fixed
+        fixed: [-0.25, -0.5]
+    
+    - value: 1.0
+      coupling: 2
+      observation_radius: 0.25
+      type: 0
+      order: 0
+      position:
+        spawn_rule: fixed
+        fixed: [0.5, -0.25]
+
+    - value: 1.0
+      coupling: 2
+      observation_radius: 0.25
+      type: 0
+      order: 0
+      position:
+        spawn_rule: fixed
+        fixed: [-0.5, 0.25]
     
     - value: 2.0
       coupling: 2
       observation_radius: 0.25
       type: 0
-      order: 1
+      order: 0
       position:
         spawn_rule: fixed
-        fixed: [-0.5, 0.5]
+        fixed: [-0.25, 1.0]
     
-    - value: 4.0
+    - value: 2.0
       coupling: 2
       observation_radius: 0.25
       type: 0
-      order: 2
+      order: 0
       position:
         spawn_rule: fixed
-        fixed: [0.5, 0.5]
+        fixed: [0.25, -1.0]
+    
+    - value: 2.0
+      coupling: 2
+      observation_radius: 0.25
+      type: 0
+      order: 0
+      position:
+        spawn_rule: fixed
+        fixed: [1.0, 0.25]
 
     - value: 2.0
       coupling: 2
       observation_radius: 0.25
       type: 0
-      order: 3
+      order: 0
       position:
         spawn_rule: fixed
-        fixed: [0.5, -0.5]
+        fixed: [-1.0, -0.25]
+
+    
 
 teaming:
   use_teaming: False
@@ -79,20 +129,19 @@ ccea:
 
   weight_initialization: kaiming
 
-  fitness_shaping: hof_difference #global/difference/
+  fitness_shaping: difference #global/difference/
 
-  selection: epsilon #epsilon/binary
+  selection: softmax #epsilon/binary/tournament
 
   policy:
     type: GRU
-    hidden_layers: [17]
+    hidden_layers: [12]
     rover_max_velocity: 1.0
 
   population:
-    subpopulation_size: 50
+    subpopulation_size: 200
 
   evaluation:
-    n_evaluations: 1
     fitness_calculation: last_step #aggregate/last_step
 
   mutation:
@@ -100,7 +149,7 @@ ccea:
     min_std_deviation: 0.05
     max_std_deviation: 0.25
 
-  n_steps: 50
+  n_steps: 80
   n_gens: 5000
 
 data:
