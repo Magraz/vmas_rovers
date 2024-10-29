@@ -25,6 +25,7 @@ class GRU_Policy(nn.Module):  # inheriting from nn.Module!
             p.requires_grad_(False)
 
     def forward(self, x: torch.Tensor):
+        self.rnn.flatten_parameters()
         _, hn = self.rnn(x.unsqueeze(0))
         out = self.output(hn)
         return F.tanh(out)
@@ -39,7 +40,7 @@ class GRU_Policy(nn.Module):  # inheriting from nn.Module!
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = GRU_Policy(input_size=8, hidden_size=17, output_size=2, n_layers=1).to(
+    model = GRU_Policy(input_size=8, hidden_size=12, output_size=2, n_layers=1).to(
         device
     )
     model_copy = deepcopy(model)

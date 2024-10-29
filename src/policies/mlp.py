@@ -61,7 +61,7 @@ class MLP_Policy(nn.Module):  # inheriting from nn.Module!
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = MLP_Policy(input_size=8, hidden_layers=2, hidden_size=32, output_size=2).to(
+    model = MLP_Policy(input_size=8, hidden_layers=2, hidden_size=23, output_size=2).to(
         device
     )
     model_copy = deepcopy(model)
