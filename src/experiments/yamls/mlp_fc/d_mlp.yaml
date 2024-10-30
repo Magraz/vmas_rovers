@@ -25,7 +25,7 @@ ccea:
     rover_max_velocity: 1.0
 
   population:
-    subpopulation_size: 200
+    subpopulation_size: 100
 
   evaluation:
     fitness_calculation: last_step #aggregate/last_step
