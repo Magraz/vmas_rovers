@@ -1,4 +1,3 @@
-use_order: False
 use_teaming: False
 use_fit_crit: False
 
@@ -20,12 +19,12 @@ ccea:
   selection: softmax #epsilon/binary/tournament
 
   policy:
-    type: GRU
-    hidden_layers: [12]
+    type: MLP
+    hidden_layers: [23, 23]
     rover_max_velocity: 1.0
 
   population:
-    subpopulation_size: 200
+    subpopulation_size: 100
 
   evaluation:
     fitness_calculation: last_step #aggregate/last_step

@@ -1,3 +1,4 @@
+use_order: False
 use_teaming: False
 use_fit_crit: False
 
@@ -16,18 +17,17 @@ ccea:
 
   fitness_shaping: global #global/difference/
 
-  selection: epsilon #epsilon/binary
+  selection: softmax #epsilon/binary/tournament
 
   policy:
     type: GRU
-    hidden_layers: [17]
+    hidden_layers: [12]
     rover_max_velocity: 1.0
 
   population:
-    subpopulation_size: 50
+    subpopulation_size: 100
 
   evaluation:
-    n_evaluations: 1
     fitness_calculation: last_step #aggregate/last_step
 
   mutation:
@@ -35,8 +35,8 @@ ccea:
     min_std_deviation: 0.05
     max_std_deviation: 0.25
 
-  n_steps: 40
-  n_gens: 500
+  n_steps: 80
+  n_gens: 5000
 
 data:
   n_gens_between_save: 20

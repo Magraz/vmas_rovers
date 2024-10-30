@@ -31,8 +31,8 @@ ccea:
 
   mutation:
     mean: 0.0
-    min_std_deviation: 0.01
-    max_std_deviation: 0.1
+    min_std_deviation: 0.05
+    max_std_deviation: 0.25
 
   n_steps: 40
   n_gens: 500
