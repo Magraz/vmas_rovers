@@ -10,12 +10,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hpc", default=False, help="use hpc config files", action="store_true"
     )
-    parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
-    parser.add_argument("--model", default="mlp", help="mlp/gru/cnn/att", type=str)
     parser.add_argument(
-        "--experiment_type",
+        "--batch",
         default="",
-        help="standard/fitness_critic/teaming",
+        help="Experiment batch",
+        type=str,
+    )
+    parser.add_argument(
+        "--name",
+        default="",
+        help="Experiment name",
         type=str,
     )
     parser.add_argument("--trial_id", default=0, help="Sets trial ID", type=int)
@@ -28,18 +32,13 @@ if __name__ == "__main__":
     if args["hpc"]:
         dir_path = "/nfs/stak/users/agrazvam/hpc-share/vmas_rovers/src"
 
-    config_dir = os.path.join(dir_path, "experiments", "yamls", args["experiment_type"])
-
-    # Set configuration file
-    experiment_name = "_".join(
-        (args["experiment_type"], args["poi_type"], args["model"])
-    )
-    yaml_filename = "_".join((args["poi_type"], args["model"])) + ".yaml"
-    config_dir = os.path.join(config_dir, yaml_filename)
+    # Set configuration folder
+    batch_dir = os.path.join(dir_path, "experiments", "yamls", args["batch"])
 
     # Run learning algorithm
     runCCEA(
-        config_dir=config_dir,
-        experiment_name=experiment_name,
+        batch_dir=batch_dir,
+        batch_name=args["batch"],
+        experiment_name=args["name"],
         trial_id=args["trial_id"],
     )

@@ -53,7 +53,7 @@ def softmaxSelection(
     chosen_ones = []
 
     individuals_fitnesses = [individual.fitness.values[0] for individual in individuals]
-    softmax_over_fitnesses = F.softmax(torch.Tensor(individuals_fitnesses))
+    softmax_over_fitnesses = F.softmax(torch.Tensor(individuals_fitnesses), dim=0)
     selected_indexes = torch.multinomial(softmax_over_fitnesses, num_samples=k)
 
     for idx in selected_indexes:

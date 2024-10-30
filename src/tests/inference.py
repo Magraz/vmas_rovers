@@ -6,9 +6,9 @@ sys.path.insert(0, "./src")
 from learning.ccea import CooperativeCoevolutionaryAlgorithm
 from domain.create_env import create_env
 
-experiment_type = "sanity"
+experiment_type = "difference"
 poi_type = "static"
-model = "mlp"
+model = "gru"
 trial = 0
 experiment_name = "_".join((experiment_type, poi_type, model))
 checkpoint_path = f"./src/tests/checkpoint.pickle"

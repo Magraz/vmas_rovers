@@ -71,77 +71,71 @@ class EvalInfo(object):
 
 
 class CooperativeCoevolutionaryAlgorithm:
-    def __init__(self, config_dir, experiment_name: str, trial_id: int):
+    def __init__(self, **kwargs):
 
-        self.trial_id = trial_id
-        self.video_name = f"{experiment_name}_{trial_id}"
-        self.config_dir = Path(os.path.expanduser(config_dir))
-        self.trials_dir = os.path.join(
-            self.config_dir.parents[2], "results", experiment_name
-        )
-
-        with open(str(self.config_dir), "r") as file:
-            self.config = yaml.safe_load(file)
+        self.batch_dir = kwargs.pop("batch_dir", None)
+        self.trials_dir = kwargs.pop("trials_dir", None)
+        self.trial_id = kwargs.pop("trial_id", 0)
+        self.video_name = kwargs.pop("video_name", None)
 
         # Experiment data
-        self.trial_name = Path(self.config_dir).stem
+        self.trial_name = kwargs.pop("trial_name", None)
 
         # Environment data
-        self.map_size = self.config["env"]["map_size"]
-        self.n_steps = self.config["ccea"]["n_steps"]
-        self.observation_size = 8
-        self.action_size = 2
+        self.map_size = kwargs.pop("map_size", [])
+        self.n_steps = kwargs.pop("n_steps", 0)
+        self.observation_size = kwargs.pop("observation_size", 0)
+        self.action_size = kwargs.pop("action_size", 0)
 
         # Agent data
-        self.n_agents = len(self.config["env"]["rovers"])
+        self.n_agents = kwargs.pop("n_agents", 0)
+        self.rover_max_vel = kwargs.pop("rover_max_vel", 0)
 
         # POIs data
-        self.n_pois = len(self.config["env"]["pois"])
+        self.n_pois = kwargs.pop("n_pois", 0)
 
         # Learning data
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.use_teaming = self.config["teaming"]["use_teaming"]
-        self.use_fc = self.config["fitness_critic"]["use_fit_crit"]
-        self.fit_crit_loss_type = self.config["fitness_critic"]["loss_type"]
+        self.device = kwargs.pop("device", None)
+
+        self.use_teaming = kwargs.pop("use_teaming", False)
+
+        self.use_fc = kwargs.pop("use_fitness_critic", False)
+        self.fit_crit_loss_type = kwargs.pop("fit_crit_loss_type", 0)
+        self.fit_crit_type = kwargs.pop("fit_crit_type", 0)
+        self.fit_crit_n_hidden = kwargs.pop("fit_crit_n_hidden", 0)
+        self.fit_crit_n_epochs = kwargs.pop("fit_crit_n_epochs", 0)
 
         self.team_size = (
-            self.config["teaming"]["team_size"] if self.use_teaming else self.n_agents
+            kwargs.pop("team_size", 0) if self.use_teaming else self.n_agents
         )
         self.team_combinations = [
             combo for combo in combinations(range(self.n_agents), self.team_size)
         ]
 
-        self.fitness_shaping_method = self.config["ccea"]["fitness_shaping"]
+        self.fitness_shaping_method = kwargs.pop("fitness_shaping_method", None)
 
-        self.subpop_size = self.config["ccea"]["population"]["subpopulation_size"]
+        self.subpop_size = kwargs.pop("subpop_size", 0)
 
-        self.policy_n_hidden = self.config["ccea"]["policy"]["hidden_layers"]
-        self.policy_type = self.config["ccea"]["policy"]["type"]
-        self.weight_initialization = self.config["ccea"]["weight_initialization"]
-
-        self.fit_crit_type = self.config["fitness_critic"]["type"]
-        self.fit_crit_n_hidden = self.config["fitness_critic"]["hidden_layers"]
+        self.policy_n_hidden = kwargs.pop("policy_n_hidden", [])
+        self.policy_type = kwargs.pop("policy_type", None)
+        self.weight_initialization = kwargs.pop("weight_initialization", None)
 
         self.n_mutants = self.subpop_size // 2
 
-        self.fitness_calculation = self.config["ccea"]["evaluation"][
-            "fitness_calculation"
-        ]
+        self.fitness_calculation = kwargs.pop("fitness_calculation", None)
 
-        self.n_gens = self.config["ccea"]["n_gens"]
+        self.n_gens = kwargs.pop("n_gens", 0)
 
-        self.selection_method = self.config["ccea"]["selection"]
+        self.selection_method = kwargs.pop("selection_method", 0)
+
+        self.max_std_dev = kwargs.pop("max_std_deviation", 0)
+        self.min_std_dev = kwargs.pop("min_std_deviation", 0)
+        self.mutation_mean = kwargs.pop("mut_mean", 0)
 
         self.std_dev_list = np.arange(
-            start=self.config["ccea"]["mutation"]["max_std_deviation"],
-            stop=self.config["ccea"]["mutation"]["min_std_deviation"],
-            step=-(
-                (
-                    self.config["ccea"]["mutation"]["max_std_deviation"]
-                    - self.config["ccea"]["mutation"]["min_std_deviation"]
-                )
-                / (self.n_gens + 1)
-            ),
+            start=self.max_std_dev,
+            stop=self.min_std_dev,
+            step=-((self.max_std_dev - self.min_std_dev) / (self.n_gens + 1)),
         )
 
         self.alpha = 0.0
@@ -150,7 +144,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.nn_template = self.generateTemplateNN()
 
         # Data saving variables
-        self.n_gens_between_save = self.config["data"]["n_gens_between_save"]
+        self.n_gens_between_save = kwargs.pop("n_gens_between_save", 0)
 
         # Create the type of fitness we're optimizing
         creator.create("FitnessMax", base.Fitness, weights=(1.0,), values=(0.0,))
@@ -164,7 +158,7 @@ class CooperativeCoevolutionaryAlgorithm:
             tools.initRepeat,
             list,
             self.createIndividual,
-            n=self.config["ccea"]["population"]["subpopulation_size"],
+            n=self.subpop_size,
         )
 
         self.toolbox.register(
@@ -306,8 +300,7 @@ class CooperativeCoevolutionaryAlgorithm:
                     actions[i] = torch.cat(
                         (
                             actions[i],
-                            policy_output
-                            * self.config["ccea"]["policy"]["rover_max_velocity"],
+                            policy_output * self.rover_max_vel,
                         ),
                         dim=0,
                     )
@@ -386,7 +379,7 @@ class CooperativeCoevolutionaryAlgorithm:
     def mutateIndividual(self, individual):
 
         individual += np.random.normal(
-            loc=self.config["ccea"]["mutation"]["mean"],
+            loc=self.mutation_mean,
             scale=self.std_dev_list[self.gen],
             size=np.shape(individual),
         )
@@ -448,7 +441,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Train fitness critics
         for fc in fitness_critics:
-            accum_loss = fc.train(epochs=self.config["fitness_critic"]["epochs"])
+            accum_loss = fc.train(epochs=self.fit_crit_n_epochs)
             fc_loss.append(accum_loss)
 
         return fc_loss
@@ -468,7 +461,7 @@ class CooperativeCoevolutionaryAlgorithm:
             case "hof_difference":
 
                 env = create_env(
-                    self.config_dir,
+                    self.batch_dir,
                     n_envs=self.subpop_size * self.n_agents,
                     device=self.device,
                 )
@@ -632,14 +625,14 @@ class CooperativeCoevolutionaryAlgorithm:
                 fitness_critics = None
 
         # Create environment for hof team
-        env = create_env(self.config_dir, n_envs=1, device=self.device)
+        env = create_env(self.batch_dir, n_envs=1, device=self.device)
 
         hof_team = self.formTeams(pop, joint_policies=1)
 
         hof_eval_info = self.evaluateTeams(env, hof_team)[0]
 
         # Create environment
-        env = create_env(self.config_dir, n_envs=self.subpop_size, device=self.device)
+        env = create_env(self.batch_dir, n_envs=self.subpop_size, device=self.device)
 
         for n_gen in range(self.n_gens + 1):
 
@@ -717,6 +710,60 @@ class CooperativeCoevolutionaryAlgorithm:
                     )
 
 
-def runCCEA(config_dir, experiment_name: str, trial_id: int):
-    ccea = CooperativeCoevolutionaryAlgorithm(config_dir, experiment_name, trial_id)
+def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int):
+
+    yaml_filename = experiment_name + ".yaml"
+
+    config_dir = os.path.join(batch_dir, yaml_filename)
+
+    with open(str(config_dir), "r") as file:
+        config = yaml.safe_load(file)
+
+    env_file = os.path.join(batch_dir, "_env.yaml")
+
+    with open(str(env_file), "r") as file:
+        env_config = yaml.safe_load(file)
+
+    ccea = CooperativeCoevolutionaryAlgorithm(
+        batch_dir=batch_dir,
+        trials_dir=os.path.join(
+            Path(batch_dir).parents[1],
+            "results",
+            "_".join((batch_name, experiment_name)),
+        ),
+        trial_id=trial_id,
+        trial_name=Path(config_dir).stem,
+        video_name=f"{experiment_name}_{trial_id}",
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        # Environment Data
+        map_size=env_config["env"]["map_size"],
+        n_steps=config["ccea"]["n_steps"],
+        observation_size=8,
+        action_size=2,
+        # Flags
+        use_teaming=config["use_teaming"],
+        use_fc=config["use_fit_crit"],
+        # Agent data
+        n_agents=len(env_config["env"]["rovers"]),
+        rover_max_vel=config["ccea"]["policy"]["rover_max_velocity"],
+        # POIs data
+        n_pois=len(env_config["env"]["pois"]),
+        # Learning data
+        n_gens=config["ccea"]["n_gens"],
+        subpop_size=config["ccea"]["population"]["subpopulation_size"],
+        selection_method=config["ccea"]["selection"],
+        mutation_mean=config["ccea"]["mutation"]["mean"],
+        max_std_deviation=config["ccea"]["mutation"]["max_std_deviation"],
+        min_std_deviation=config["ccea"]["mutation"]["min_std_deviation"],
+        fitness_calculation=config["ccea"]["evaluation"]["fitness_calculation"],
+        fitness_shaping_method=config["ccea"]["fitness_shaping"],
+        policy_n_hidden=config["ccea"]["policy"]["hidden_layers"],
+        policy_type=config["ccea"]["policy"]["type"],
+        weight_initialization=config["ccea"]["weight_initialization"],
+        team_size=config["teaming"]["team_size"],
+        fit_crit_loss_type=config["fitness_critic"]["loss_type"],
+        fit_crit_type=config["fitness_critic"]["type"],
+        fit_crit_n_hidden=config["fitness_critic"]["hidden_layers"],
+        n_gens_between_save=config["data"]["n_gens_between_save"],
+    )
     return ccea.run()

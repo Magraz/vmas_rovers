@@ -1,0 +1,42 @@
+use_order: False
+use_teaming: False
+use_fit_crit: False
+
+teaming:
+  team_size: 0
+
+fitness_critic:
+    epochs: 1
+    type: MLP #MLP/ATTENTION
+    loss_type: MSE+MAE #MSE/MAE/MSE+MAE
+    hidden_layers: [80,80]
+
+ccea:
+
+  weight_initialization: kaiming
+
+  fitness_shaping: difference #global/difference/
+
+  selection: softmax #epsilon/binary/tournament
+
+  policy:
+    type: MLP
+    hidden_layers: [23, 23]
+    rover_max_velocity: 1.0
+
+  population:
+    subpopulation_size: 200
+
+  evaluation:
+    fitness_calculation: last_step #aggregate/last_step
+
+  mutation:
+    mean: 0.0
+    min_std_deviation: 0.05
+    max_std_deviation: 0.25
+
+  n_steps: 80
+  n_gens: 5000
+
+data:
+  n_gens_between_save: 20
