@@ -47,7 +47,6 @@ def epsilonGreedySelection(
 def softmaxSelection(
     individuals,
     k: int,
-    fit_attr: str = "fitness",
 ):
 
     chosen_ones = []
