@@ -766,7 +766,7 @@ def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int
         fc_loss_type=config["fitness_critic"]["loss_type"],
         fc_type=config["fitness_critic"]["type"],
         fc_n_hidden=config["fitness_critic"]["hidden_layers"],
-        fitness_calculation=config["fitness_calculation"],
+        fitness_calculation=config["ccea"]["fitness_calculation"],
         n_gens_between_save=config["data"]["n_gens_between_save"],
     )
     return ccea.run()
