@@ -29,6 +29,7 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
     poi_values = [poi["value"] for poi in env_config["env"]["pois"]]
     poi_types = [poi["type"] for poi in env_config["env"]["pois"]]
     poi_orders = [poi["order"] for poi in env_config["env"]["pois"]]
+    poi_colors = [poi["color"] for poi in env_config["env"]["pois"]]
     coupling = [poi["coupling"] for poi in env_config["env"]["pois"]]
     obs_radius = [poi["observation_radius"] for poi in env_config["env"]["pois"]]
     use_order = env_config["env"]["use_order"]
@@ -45,6 +46,7 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
         agents_positions=agents_positions,
         targets_positions=poi_positions,
         targets_values=poi_values,
+        targets_colors=poi_colors,
         x_semidim=map_size[0],
         y_semidim=map_size[1],
         agents_per_target=coupling[0],

@@ -2,14 +2,13 @@ from learning.ccea import runCCEA
 import os
 
 import argparse
+from pathlib import Path
 
 if __name__ == "__main__":
 
     # Arg parser variables
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--hpc", default=False, help="use hpc config files", action="store_true"
-    )
+
     parser.add_argument(
         "--batch",
         default="",
@@ -27,13 +26,10 @@ if __name__ == "__main__":
     args = vars(parser.parse_args())
 
     # Set base_config path
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-
-    if args["hpc"]:
-        dir_path = "/nfs/stak/users/agrazvam/hpc-share/vmas_rovers/src"
+    dir_path = Path(__file__).parent
 
     # Set configuration folder
-    batch_dir = os.path.join(dir_path, "experiments", "yamls", args["batch"])
+    batch_dir = dir_path / "experiments" / "yamls" / args["batch"]
 
     # Run learning algorithm
     runCCEA(

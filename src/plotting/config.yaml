@@ -1,0 +1,6 @@
+#Experiment config
+batch_name: "mlp_fc"
+experiment_names: ["d_mlp"]
+trials_start: 0
+trials_finish: 10
+data_points: 3000

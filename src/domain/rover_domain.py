@@ -3,23 +3,28 @@
 #  All rights reserved.
 
 import typing
-from typing import Callable, Dict, List
+from typing import Dict, List
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor
 
 from vmas import render_interactively
-from vmas.simulator.core import Agent, Entity, Landmark, Sphere, World
+from vmas.simulator.core import Agent, Landmark, Sphere, World
 from vmas.simulator.heuristic_policy import BaseHeuristicPolicy
 from vmas.simulator.scenario import BaseScenario
-from vmas.simulator.sensors import Lidar
 from vmas.simulator.utils import Color, ScenarioUtils
 
 if typing.TYPE_CHECKING:
     from vmas.simulator.rendering import Geom
 
 from domain.custom_sensors import SectorDensity
+
+COLOR_MAP = {
+    "GREEN": Color.GREEN,
+    "RED": Color.RED,
+    "BLUE": Color.BLUE,
+    "BLACK": Color.BLACK,
+}
 
 
 class RoverDomain(BaseScenario):
@@ -32,6 +37,7 @@ class RoverDomain(BaseScenario):
         self.n_targets = kwargs.pop("n_targets", 7)
         self.use_order = kwargs.pop("use_order", False)
         self.targets_positions = kwargs.pop("targets_positions", [])
+        self.targets_colors = kwargs.pop("targets_colors", [])
         self.targets_orders = kwargs.pop("targets_orders", [])
         self.targets_types = kwargs.pop("targets_types", [])
         self.targets_values = torch.tensor(
@@ -51,14 +57,17 @@ class RoverDomain(BaseScenario):
 
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
-        self._comms_range = self._lidar_range
-        self.min_collision_distance = 0.005
         self.agent_radius = 0.05
         self.target_radius = self.agent_radius
 
-        self.viewer_zoom = 1.2
-        self.target_color = Color.GREEN
         self.device = device
+
+        self.current_order_per_env = torch.zeros((batch_dim, 1), device=device)
+
+        self.order_tensor = torch.tensor(self.targets_orders, device=device)
+
+        self.global_rew = torch.zeros(batch_dim, device=device)
+        self.covered_targets = torch.zeros((batch_dim, self.n_targets), device=device)
 
         # Make world
         world = World(
@@ -66,19 +75,20 @@ class RoverDomain(BaseScenario):
             device,
             x_semidim=self.x_semidim,
             y_semidim=self.y_semidim,
-            collision_force=500,
             substeps=2,
-            drag=0.25,
         )
 
+        # Set targets
         self._targets = []
         for i in range(self.n_targets):
+
             target = Landmark(
                 name=f"target_{i}",
                 collide=False,
                 shape=Sphere(radius=self.target_radius),
-                color=self.target_color,
+                color=COLOR_MAP[self.targets_colors[i]],
             )
+
             target.value = self.targets_values[i]
             target.type = self.targets_types[i]
             target.order = self.targets_orders[i]
@@ -86,6 +96,7 @@ class RoverDomain(BaseScenario):
             world.add_landmark(target)
             self._targets.append(target)
 
+        # Set agents
         for i in range(self.n_agents):
             # Constraint: all agents have same action range and multiplier
             agent = Agent(
@@ -96,13 +107,6 @@ class RoverDomain(BaseScenario):
             )
             agent.difference_rew = torch.zeros(batch_dim, device=device)
             world.add_agent(agent)
-
-        self.current_order_per_env = torch.zeros((batch_dim, 1), device=device)
-
-        self.order_tensor = torch.tensor(self.targets_orders, device=device)
-
-        self.global_rew = torch.zeros(batch_dim, device=device)
-        self.covered_targets = torch.zeros((batch_dim, self.n_targets), device=device)
 
         return world
 
@@ -149,11 +153,13 @@ class RoverDomain(BaseScenario):
                     batch_index=env_index,
                 )
 
-    def get_order_mask(self, covered_targets):
+    def get_order_mask(self, covered_targets: torch.Tensor) -> torch.Tensor:
         current_order_tensor = covered_targets * self.order_tensor
         return current_order_tensor == self.current_order_per_env
 
-    def calculate_global_reward(self, targets_pos, agent: Agent):
+    def calculate_global_reward(
+        self, targets_pos: torch.Tensor, agent: Agent
+    ) -> torch.Tensor:
 
         agents_pos = torch.stack([a.state.pos for a in self.world.agents], dim=1)
 
@@ -198,7 +204,9 @@ class RoverDomain(BaseScenario):
             dim=1,
         )
 
-    def calculate_difference_reward(self, targets_pos, me: Agent):
+    def calculate_difference_reward(
+        self, targets_pos: torch.Tensor, me: Agent
+    ) -> torch.Tensor:
 
         global_rew_without_me = torch.zeros(
             self.world.batch_dim, device=self.world.device
@@ -268,7 +276,7 @@ class RoverDomain(BaseScenario):
 
         return self.global_rew - global_rew_without_me
 
-    def reward(self, agent: Agent):
+    def reward(self, agent: Agent) -> torch.Tensor:
         is_first = agent == self.world.agents[0]
         is_last = agent == self.world.agents[-1]
 
@@ -293,7 +301,7 @@ class RoverDomain(BaseScenario):
 
         return covering_rew
 
-    def get_outside_pos(self, env_index):
+    def get_outside_pos(self, env_index) -> torch.Tensor:
         return torch.empty(
             (
                 (1, self.world.dim_p)
@@ -303,7 +311,7 @@ class RoverDomain(BaseScenario):
             device=self.world.device,
         ).uniform_(-1000 * self.world.x_semidim, -10 * self.world.x_semidim)
 
-    def observation(self, agent: Agent):
+    def observation(self, agent: Agent) -> torch.Tensor:
 
         obs = agent.sensors[0].measure()
 
@@ -332,25 +340,6 @@ class RoverDomain(BaseScenario):
             range_circle.add_attr(xform)
             range_circle.set_color(*self.target_color.value)
             geoms.append(range_circle)
-        # Communication lines
-        # for i, agent1 in enumerate(self.world.agents):
-        #     for j, agent2 in enumerate(self.world.agents):
-        #         if j <= i:
-        #             continue
-        #         agent_dist = torch.linalg.vector_norm(
-        #             agent1.state.pos - agent2.state.pos, dim=-1
-        #         )
-        #         if agent_dist[env_index] <= self._comms_range:
-        #             color = Color.BLACK.value
-        #             line = rendering.Line(
-        #                 (agent1.state.pos[env_index]),
-        #                 (agent2.state.pos[env_index]),
-        #                 width=1,
-        #             )
-        #             xform = rendering.Transform()
-        #             line.add_attr(xform)
-        #             line.set_color(*color)
-        #             geoms.append(line)
 
         return geoms
 
