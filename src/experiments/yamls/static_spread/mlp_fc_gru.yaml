@@ -1,6 +1,6 @@
 use_order: False
 use_teaming: False
-use_fc: False
+use_fc: True
 
 teaming:
   team_size: 0
@@ -13,13 +13,13 @@ fitness_critic:
 
 policy:
     weight_initialization: kaiming
-    type: MLP
-    hidden_layers: [23,23]
+    type: GRU
+    hidden_layers: [12]
     output_multiplier: 1.0
 
 ccea:
 
-  fitness_shaping: difference
+  fitness_shaping: fitness_critics
 
   selection: softmax
 

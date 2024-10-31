@@ -88,7 +88,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Agent data
         self.n_agents = kwargs.pop("n_agents", 0)
-        self.rover_max_vel = kwargs.pop("rover_max_vel", 0)
+        self.output_multiplier = kwargs.pop("output_multiplier", 0)
 
         # POIs data
         self.n_pois = kwargs.pop("n_pois", 0)
@@ -98,11 +98,11 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.use_teaming = kwargs.pop("use_teaming", False)
 
-        self.use_fc = kwargs.pop("use_fitness_critic", False)
-        self.fit_crit_loss_type = kwargs.pop("fit_crit_loss_type", 0)
-        self.fit_crit_type = kwargs.pop("fit_crit_type", 0)
-        self.fit_crit_n_hidden = kwargs.pop("fit_crit_n_hidden", 0)
-        self.fit_crit_n_epochs = kwargs.pop("fit_crit_n_epochs", 0)
+        self.use_fc = kwargs.pop("use_fc", False)
+        self.fc_loss_type = kwargs.pop("fc_loss_type", 0)
+        self.fc_type = kwargs.pop("fc_type", 0)
+        self.fc_n_hidden = kwargs.pop("fc_n_hidden", 0)
+        self.fc_n_epochs = kwargs.pop("fc_n_epochs", 0)
 
         self.team_size = (
             kwargs.pop("team_size", 0) if self.use_teaming else self.n_agents
@@ -146,8 +146,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.n_gens_between_save = kwargs.pop("n_gens_between_save", 0)
 
         # Create the type of fitness we're optimizing
-        creator.create("FitnessMax", base.Fitness, weights=(1.0,), values=(0.0,))
-        creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
+        creator.create("Individual", np.ndarray, fitness=0.0)
 
         # Now set up the toolbox
         self.toolbox = base.Toolbox()
@@ -299,7 +298,7 @@ class CooperativeCoevolutionaryAlgorithm:
                     actions[i] = torch.cat(
                         (
                             actions[i],
-                            policy_output * self.rover_max_vel,
+                            policy_output * self.output_multiplier,
                         ),
                         dim=0,
                     )
@@ -391,7 +390,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             for subpop in population:
                 self.mutateIndividual(subpop[mutant_idx])
-                subpop[mutant_idx].fitness.values = (np.float32(0.0),)
+                subpop[mutant_idx].fitness = np.float32(0.0)
 
     def selectSubPopulation(self, subpopulation):
 
@@ -440,23 +439,33 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Train fitness critics
         for fc in fitness_critics:
-            accum_loss = fc.train(epochs=self.fit_crit_n_epochs)
+            accum_loss = fc.train(epochs=self.fc_n_epochs)
             fc_loss.append(accum_loss)
 
         return fc_loss
 
     def assignFitnesses(
         self,
-        fitness_critics,
+        fitness_critics: list[FitnessCritic],
         eval_infos: list[EvalInfo],
         hof_eval_info: EvalInfo,
     ):
 
         match (self.fitness_shaping_method):
+            case "fitness_critics":
+                for eval_info in eval_infos:
+                    for idx, individual in zip(
+                        eval_info.team.combination, eval_info.team.individuals
+                    ):
+                        individual.fitness = fitness_critics[idx].evaluate(
+                            eval_info.joint_traj.observations[idx, :, :]
+                        )
+
             case "global":
                 for eval_info in eval_infos:
                     for individual in eval_info.team.individuals:
-                        individual.fitness.values = (eval_info.team_fitness,)
+                        individual.fitness = eval_info.team_fitness
+
             case "hof_difference":
 
                 env = create_env(
@@ -491,7 +500,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
                     d_hof = mod_hof_eval_info.team_fitness - hof_eval_info.team_fitness
 
-                    mod_hof_eval_info.team.individuals[mod_idx].fitness.values = (
+                    mod_hof_eval_info.team.individuals[mod_idx].fitness = (
                         (1 - self.alpha) * eval_info.agent_fitnesses[combo_idx]
                         + self.alpha * d_hof,
                     )
@@ -501,9 +510,7 @@ class CooperativeCoevolutionaryAlgorithm:
                         eval_info.team.individuals,
                         eval_info.team.combination,
                     ):
-                        individual.fitness.values = (
-                            eval_info.agent_fitnesses[combo_idx],
-                        )
+                        individual.fitness = eval_info.agent_fitnesses[combo_idx]
 
     def setPopulation(self, population, offspring):
         for subpop, subpop_offspring in zip(population, offspring):
@@ -523,33 +530,31 @@ class CooperativeCoevolutionaryAlgorithm:
             writer = csv.writer(csvfile)
             writer.writerow([self.gen, avg_fitness, best_fitness])
 
-    def init_fitness_critics(self):
+    def init_fitness_critics(self) -> list[FitnessCritic]:
         # Initialize fitness critics
         fc = None
 
-        if self.use_fc:
+        loss_fn = 0
 
-            loss_fn = 0
+        match self.fc_loss_type:
+            case "MSE":
+                loss_fn = 0
+            case "MAE":
+                loss_fn = 1
+            case "MSE+MAE":
+                loss_fn = 2
 
-            match self.fit_crit_loss_type:
-                case "MSE":
-                    loss_fn = 0
-                case "MAE":
-                    loss_fn = 1
-                case "MSE+MAE":
-                    loss_fn = 2
-
-            fc = [
-                FitnessCritic(
-                    device=self.device,
-                    model_type=self.fit_crit_type,
-                    loss_fn=loss_fn,
-                    episode_size=self.n_steps,
-                    hidden_size=self.fit_crit_n_hidden,
-                    n_layers=len(self.fit_crit_n_hidden),
-                )
-                for _ in range(self.n_agents)
-            ]
+        fc = [
+            FitnessCritic(
+                device=self.device,
+                model_type=self.fc_type,
+                loss_fn=loss_fn,
+                episode_size=self.n_steps,
+                hidden_size=self.fc_n_hidden,
+                n_layers=len(self.fc_n_hidden),
+            )
+            for _ in range(self.n_agents)
+        ]
 
         return fc
 
@@ -578,7 +583,11 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Load checkpoint
         checkpoint_exists = Path(checkpoint_name).is_file()
+        fitness_critics = None
+
         if checkpoint_exists:
+
+            # Load checkpoint file
             with open(checkpoint_name, "rb") as handle:
                 checkpoint = pickle.load(handle)
                 pop = checkpoint["population"]
@@ -590,8 +599,6 @@ class CooperativeCoevolutionaryAlgorithm:
                 fitness_critics = self.init_fitness_critics()
                 for fc, params in zip(fitness_critics, fc_params):
                     fc.model.set_params(params)
-            else:
-                fitness_critics = None
 
             # Set fitness csv file to checkpoint
             new_fit_path = os.path.join(trial_dir, "fitness_edit.csv")
@@ -620,8 +627,6 @@ class CooperativeCoevolutionaryAlgorithm:
             # Initialize fitness critics
             if self.use_fc:
                 fitness_critics = self.init_fitness_critics()
-            else:
-                fitness_critics = None
 
         # Create environment for hof team
         env = create_env(self.batch_dir, n_envs=1, device=self.device)
@@ -739,28 +744,29 @@ def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int
         action_size=2,
         # Flags
         use_teaming=config["use_teaming"],
-        use_fc=config["use_fit_crit"],
+        use_fc=config["use_fc"],
         # Agent data
         n_agents=len(env_config["env"]["rovers"]),
-        rover_max_vel=config["ccea"]["policy"]["rover_max_velocity"],
+        policy_type=config["policy"]["type"],
+        policy_n_hidden=config["policy"]["hidden_layers"],
+        weight_initialization=config["policy"]["weight_initialization"],
+        output_multiplier=config["policy"]["output_multiplier"],
         # POIs data
         n_pois=len(env_config["env"]["pois"]),
         # Learning data
         n_gens=config["ccea"]["n_gens"],
-        subpop_size=config["ccea"]["population"]["subpopulation_size"],
+        subpop_size=config["ccea"]["subpopulation_size"],
         selection_method=config["ccea"]["selection"],
         mutation_mean=config["ccea"]["mutation"]["mean"],
         max_std_deviation=config["ccea"]["mutation"]["max_std_deviation"],
         min_std_deviation=config["ccea"]["mutation"]["min_std_deviation"],
-        fitness_calculation=config["ccea"]["evaluation"]["fitness_calculation"],
         fitness_shaping_method=config["ccea"]["fitness_shaping"],
-        policy_n_hidden=config["ccea"]["policy"]["hidden_layers"],
-        policy_type=config["ccea"]["policy"]["type"],
-        weight_initialization=config["ccea"]["weight_initialization"],
         team_size=config["teaming"]["team_size"],
-        fit_crit_loss_type=config["fitness_critic"]["loss_type"],
-        fit_crit_type=config["fitness_critic"]["type"],
-        fit_crit_n_hidden=config["fitness_critic"]["hidden_layers"],
+        fc_n_epochs=config["fitness_critic"]["epochs"],
+        fc_loss_type=config["fitness_critic"]["loss_type"],
+        fc_type=config["fitness_critic"]["type"],
+        fc_n_hidden=config["fitness_critic"]["hidden_layers"],
+        fitness_calculation=config["fitness_calculation"],
         n_gens_between_save=config["data"]["n_gens_between_save"],
     )
     return ccea.run()

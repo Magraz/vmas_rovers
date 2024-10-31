@@ -97,12 +97,7 @@ class FitnessCritic:
         self.hist.append((trajectory, G))
 
     def evaluate(self, trajectory):  # evaluate max state
-        result = (
-            self.model.forward(torch.from_numpy(trajectory).to(self.device))
-            .cpu()
-            .detach()
-            .numpy()
-        )
+        result = self.model.forward(trajectory).cpu().detach().numpy()
         return np.max(result)
 
     def train(self, epochs: int):

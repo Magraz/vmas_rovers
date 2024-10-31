@@ -43,6 +43,7 @@ env:
     - value: 1.0
       coupling: 2
       observation_radius: 0.25
+      color: "GREEN"
       type: 0
       order: 0
       position:
@@ -52,6 +53,7 @@ env:
     - value: 1.0
       coupling: 2
       observation_radius: 0.25
+      color: "GREEN"
       type: 0
       order: 0
       position:
@@ -61,6 +63,7 @@ env:
     - value: 1.0
       coupling: 2
       observation_radius: 0.25
+      color: "GREEN"
       type: 0
       order: 0
       position:
@@ -70,6 +73,7 @@ env:
     - value: 1.0
       coupling: 2
       observation_radius: 0.25
+      color: "GREEN"
       type: 0
       order: 0
       position:
@@ -79,6 +83,7 @@ env:
     - value: 2.0
       coupling: 2
       observation_radius: 0.25
+      color: "RED"
       type: 0
       order: 0
       position:
@@ -88,6 +93,7 @@ env:
     - value: 2.0
       coupling: 2
       observation_radius: 0.25
+      color: "RED"
       type: 0
       order: 0
       position:
@@ -97,6 +103,7 @@ env:
     - value: 2.0
       coupling: 2
       observation_radius: 0.25
+      color: "RED"
       type: 0
       order: 0
       position:
@@ -106,6 +113,7 @@ env:
     - value: 2.0
       coupling: 2
       observation_radius: 0.25
+      color: "RED"
       type: 0
       order: 0
       position:

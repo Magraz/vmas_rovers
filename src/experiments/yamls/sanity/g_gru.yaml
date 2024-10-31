@@ -13,13 +13,13 @@ fitness_critic:
 
 policy:
     weight_initialization: kaiming
-    type: MLP
-    hidden_layers: [23,23]
+    type: GRU
+    hidden_layers: [8]
     output_multiplier: 1.0
 
 ccea:
 
-  fitness_shaping: difference
+  fitness_shaping: global
 
   selection: softmax
 
@@ -32,8 +32,8 @@ ccea:
     min_std_deviation: 0.05
     max_std_deviation: 0.25
 
-  n_steps: 80
-  n_gens: 5000
+  n_steps: 40
+  n_gens: 500
 
 data:
   n_gens_between_save: 20
