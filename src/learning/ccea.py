@@ -26,7 +26,6 @@ import pickle
 import csv
 
 from itertools import combinations
-from operator import attrgetter
 
 # Create and configure logger
 logging.basicConfig(format="%(asctime)s %(message)s")
@@ -712,9 +711,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
 def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int):
 
-    yaml_filename = experiment_name + ".yaml"
-
-    config_dir = os.path.join(batch_dir, yaml_filename)
+    config_dir = os.path.join(batch_dir, f"{experiment_name}.yaml")
 
     with open(str(config_dir), "r") as file:
         config = yaml.safe_load(file)
