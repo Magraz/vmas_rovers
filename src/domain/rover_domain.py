@@ -33,6 +33,8 @@ class RoverDomain(BaseScenario):
         self.x_semidim = kwargs.pop("x_semidim", 1)
         self.y_semidim = kwargs.pop("y_semidim", 1)
 
+        self.viewer_zoom = kwargs.pop("viewer_zoom", 1)
+
         self.n_agents = kwargs.pop("n_agents", 5)
         self.n_targets = kwargs.pop("n_targets", 7)
         self.use_order = kwargs.pop("use_order", False)

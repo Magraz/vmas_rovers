@@ -55,6 +55,7 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
         targets_types=poi_types,
         targets_orders=poi_orders,
         use_order=use_order,
+        viewer_zoom=kwargs.pop("viewer_zoom", 1)
     )
 
     return env

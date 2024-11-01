@@ -77,7 +77,7 @@ ccea = CooperativeCoevolutionaryAlgorithm(
 )
 
 eval_infos = ccea.evaluateTeams(
-    create_env(batch_dir=batch_dir, n_envs=1, device=ccea.device),
+    create_env(batch_dir=batch_dir, n_envs=1, device=ccea.device, viewer_zoom=2),
     [best_team],
     render=True,
     save_render=True,
