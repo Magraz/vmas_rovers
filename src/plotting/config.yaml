@@ -1,6 +1,6 @@
 #Experiment config
-batch_name: "mlp_fc"
-experiment_names: ["d_mlp"]
+batch_name: "static_spread"
+experiment_names: ["d_gru", "d_mlp", "g_mlp", "g_gru"]
 trials_start: 0
 trials_finish: 10
-data_points: 3000
+data_points: 1700

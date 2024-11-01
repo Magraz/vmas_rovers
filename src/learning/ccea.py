@@ -572,7 +572,7 @@ class CooperativeCoevolutionaryAlgorithm:
     def run(self):
 
         # Set trial directory name
-        trial_folder_name = "_".join(("trial", str(self.trial_id), self.trial_name))
+        trial_folder_name = "_".join(("trial", str(self.trial_id)))
         trial_dir = os.path.join(self.trials_dir, trial_folder_name)
         eval_fit_dir = f"{trial_dir}/fitness.csv"
         checkpoint_name = os.path.join(trial_dir, "checkpoint.pickle")
@@ -728,11 +728,10 @@ def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int
 
     ccea = CooperativeCoevolutionaryAlgorithm(
         batch_dir=batch_dir,
-        trials_dir=os.path.join(
-            Path(batch_dir).parents[1],
-            "results",
-            "_".join((batch_name, experiment_name)),
-        ),
+        trials_dir=Path(batch_dir).parents[1]
+        / "results"
+        / batch_name
+        / experiment_name,
         trial_id=trial_id,
         trial_name=Path(config_dir).stem,
         video_name=f"{experiment_name}_{trial_id}",
