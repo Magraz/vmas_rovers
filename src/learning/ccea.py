@@ -665,7 +665,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             # Train Fitness Critics
             if self.use_fc:
-                fc_loss = self.trainFitnessCritics(fitness_critics, eval_infos)
+                _ = self.trainFitnessCritics(fitness_critics, eval_infos)
                 # self.writeFitCritLossCSV(trial_dir, fc_loss)
 
             # Now assign fitnesses to each individual
@@ -693,7 +693,7 @@ class CooperativeCoevolutionaryAlgorithm:
             )
 
             # Save trajectories and checkpoint
-            if n_gen % self.n_gens_between_save == 0:
+            if (n_gen > 0) and (n_gen % self.n_gens_between_save == 0):
 
                 # Save checkpoint
                 with open(os.path.join(trial_dir, "checkpoint.pickle"), "wb") as handle:
