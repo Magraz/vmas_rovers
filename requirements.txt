@@ -2,3 +2,5 @@ torch
 numpy
 matplotlib
 deap
+opencv-python
+PyYAML

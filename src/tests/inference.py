@@ -11,12 +11,11 @@ from learning.ccea import CooperativeCoevolutionaryAlgorithm
 from domain.create_env import create_env
 
 batch_name = "static_spread"
-experiment_name = "g_mlp"
+experiment_name = "d_gru"
 trial_id = 0
 checkpoint_path = f"./src/tests/checkpoint.pickle"
 batch_dir = f"./src/experiments/yamls/{batch_name}"
 config_dir = os.path.join(batch_dir, f"{experiment_name}.yaml")
-
 
 with open(str(config_dir), "r") as file:
     config = yaml.safe_load(file)
@@ -51,28 +50,29 @@ ccea = CooperativeCoevolutionaryAlgorithm(
     action_size=2,
     # Flags
     use_teaming=config["use_teaming"],
-    use_fc=config["use_fit_crit"],
+    use_fc=config["use_fc"],
     # Agent data
     n_agents=len(env_config["env"]["rovers"]),
-    rover_max_vel=config["ccea"]["policy"]["rover_max_velocity"],
+    policy_type=config["policy"]["type"],
+    policy_n_hidden=config["policy"]["hidden_layers"],
+    weight_initialization=config["policy"]["weight_initialization"],
+    output_multiplier=config["policy"]["output_multiplier"],
     # POIs data
     n_pois=len(env_config["env"]["pois"]),
     # Learning data
     n_gens=config["ccea"]["n_gens"],
-    subpop_size=config["ccea"]["population"]["subpopulation_size"],
+    subpop_size=config["ccea"]["subpopulation_size"],
     selection_method=config["ccea"]["selection"],
     mutation_mean=config["ccea"]["mutation"]["mean"],
     max_std_deviation=config["ccea"]["mutation"]["max_std_deviation"],
     min_std_deviation=config["ccea"]["mutation"]["min_std_deviation"],
-    fitness_calculation=config["ccea"]["evaluation"]["fitness_calculation"],
     fitness_shaping_method=config["ccea"]["fitness_shaping"],
-    policy_n_hidden=config["ccea"]["policy"]["hidden_layers"],
-    policy_type=config["ccea"]["policy"]["type"],
-    weight_initialization=config["ccea"]["weight_initialization"],
     team_size=config["teaming"]["team_size"],
-    fit_crit_loss_type=config["fitness_critic"]["loss_type"],
-    fit_crit_type=config["fitness_critic"]["type"],
-    fit_crit_n_hidden=config["fitness_critic"]["hidden_layers"],
+    fc_n_epochs=config["fitness_critic"]["epochs"],
+    fc_loss_type=config["fitness_critic"]["loss_type"],
+    fc_type=config["fitness_critic"]["type"],
+    fc_n_hidden=config["fitness_critic"]["hidden_layers"],
+    fitness_calculation=config["ccea"]["fitness_calculation"],
     n_gens_between_save=config["data"]["n_gens_between_save"],
 )
 

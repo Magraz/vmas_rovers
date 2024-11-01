@@ -333,12 +333,12 @@ class RoverDomain(BaseScenario):
 
         geoms: List[Geom] = []
         # Target ranges
-        for target in self._targets:
+        for i, target in enumerate(self._targets):
             range_circle = rendering.make_circle(self._covering_range, filled=False)
             xform = rendering.Transform()
             xform.set_translation(*target.state.pos[env_index])
             range_circle.add_attr(xform)
-            range_circle.set_color(*self.target_color.value)
+            range_circle.set_color(*COLOR_MAP[self.targets_colors[i]].value)
             geoms.append(range_circle)
 
         return geoms
