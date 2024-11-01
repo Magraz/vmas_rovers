@@ -1,21 +1,19 @@
 ### To Install
 
-Run the following commands inside repo after cloning:
+Run the following commands inside `/vmas_rovers` after cloning:
 1. `git submodule init`
 2. `git submodule update`
-3. `pip install -r requirements.txt`
-4. `cd VectorizedMultiAgentSimulator`
-5. `pip install -e .`
+3. `cd VectorizedMultiAgentSimulator`
+4. `pip install -e .`
+5. `pip install -r requirements.txt`
+
 
 
 ### To Run Experiment
 
-Run the following command for running experiments with all default values:
-- `python3 src/run_experiment.py`
-
 Run the following command for running experiments in different modalities:
 
-- `python3 src/run_ccea.py --experiment_type=standard --poi_type static --model mlp --trial_id=<trial_id>`
+- `python3 src/run_ccea.py --batch=static_spread --name=g_mlp --trial_id=0`
 
 Run N number of trials in parallel (Requires GNU Parallel Package)
 
