@@ -25,7 +25,7 @@ ccea:
 
   subpopulation_size: 100
 
-  fitness_calculation: last_step
+  fitness_calculation: aggregate
 
   mutation:
     mean: 0.0

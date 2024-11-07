@@ -7,9 +7,9 @@ teaming:
 
 fitness_critic:
     epochs: 10
-    type: MLP
+    type: GRU
     loss_type: MSE+MAE
-    hidden_layers: [80,80]
+    hidden_layers: [44]
 
 policy:
     weight_initialization: kaiming
@@ -25,7 +25,7 @@ ccea:
 
   subpopulation_size: 100
 
-  fitness_calculation: last_step
+  fitness_calculation: aggregate
 
   mutation:
     mean: 0.0
