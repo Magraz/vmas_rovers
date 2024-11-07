@@ -1,4 +1,4 @@
-from learning.ccea import runCCEA
+from learning.ccea.run import runCCEA
 import os
 
 import argparse

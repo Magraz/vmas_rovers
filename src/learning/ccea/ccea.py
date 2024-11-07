@@ -14,7 +14,12 @@ from policies.cnn import CNN_Policy
 
 from fitness_critic.fitness_critic import FitnessCritic
 from domain.create_env import create_env
-from learning.selection import binarySelection, epsilonGreedySelection, softmaxSelection
+from learning.ccea.selection import (
+    binarySelection,
+    epsilonGreedySelection,
+    softmaxSelection,
+)
+from learning.ccea.custom_types import JointTrajectory, Team, EvalInfo
 
 from copy import deepcopy
 import numpy as np
@@ -35,38 +40,6 @@ logger = logging.getLogger()
 
 # Setting the threshold of logger to DEBUG
 logger.setLevel(logging.INFO)
-
-
-class Team(object):
-    def __init__(
-        self,
-        idx: int,
-        individuals: list = None,
-        combination: list = None,
-    ):
-        self.idx = idx
-        self.individuals = individuals if individuals is not None else []
-        self.combination = combination if combination is not None else []
-
-
-class JointTrajectory(object):
-    def __init__(self, joint_state_traj: list, joint_obs_traj: list):
-        self.states = joint_state_traj
-        self.observations = joint_obs_traj
-
-
-class EvalInfo(object):
-    def __init__(
-        self,
-        team: Team,
-        team_fitness: float,
-        agent_fitnesses: list[float],
-        joint_traj: list,
-    ):
-        self.team = team
-        self.agent_fitnesses = agent_fitnesses
-        self.team_fitness = team_fitness
-        self.joint_traj = joint_traj
 
 
 class CooperativeCoevolutionaryAlgorithm:
@@ -137,10 +110,9 @@ class CooperativeCoevolutionaryAlgorithm:
             step=-((self.max_std_dev - self.min_std_dev) / (self.n_gens + 1)),
         )
 
+        # HOF Alpha Decay
         self.alpha = 0.0
         self.alpha_max = 0.5
-
-        self.nn_template = self.generateTemplateNN()
 
         # Data saving variables
         self.n_gens_between_save = kwargs.pop("n_gens_between_save", 0)
@@ -243,7 +215,7 @@ class CooperativeCoevolutionaryAlgorithm:
     ):
         # Set up models
         joint_policies = [
-            [deepcopy(self.nn_template) for _ in range(self.team_size)] for _ in teams
+            [self.generateTemplateNN() for _ in range(self.team_size)] for _ in teams
         ]
 
         # Load in the weights
@@ -504,6 +476,7 @@ class CooperativeCoevolutionaryAlgorithm:
                         (1 - self.alpha) * eval_info.agent_fitnesses[combo_idx]
                         + self.alpha * d_hof,
                     )
+
             case "difference":
                 for eval_info in eval_infos:
                     for individual, combo_idx in zip(
@@ -516,17 +489,17 @@ class CooperativeCoevolutionaryAlgorithm:
         for subpop, subpop_offspring in zip(population, offspring):
             subpop[:] = subpop_offspring
 
-    def createEvalFitnessCSV(self, eval_fit_dir):
+    def createFitnessCSV(self, fitness_dir):
         header = ["gen", "avg_team_fitness", "best_team_fitness"]
 
-        with open(eval_fit_dir, "w", newline="") as csvfile:
+        with open(fitness_dir, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerows([header])
 
-    def writeEvalFitnessCSV(self, eval_fit_dir, avg_fitness, best_fitness):
+    def writeFitnessCSV(self, fitness_dir, avg_fitness, best_fitness):
 
         # Now save it all to the csv
-        with open(eval_fit_dir, "a", newline="") as csvfile:
+        with open(fitness_dir, "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow([self.gen, avg_fitness, best_fitness])
 
@@ -569,60 +542,75 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return new_hol_eval_info
 
+    def load_checkpoint(
+        self,
+        checkpoint_name: str,
+        fitness_dir: str,
+        trial_dir: str,
+        fitness_critics: list[FitnessCritic],
+    ):
+        # Load checkpoint file
+        with open(checkpoint_name, "rb") as handle:
+            checkpoint = pickle.load(handle)
+            pop = checkpoint["population"]
+            checkpoint_gen = checkpoint["gen"]
+            fc_params = checkpoint["fitness_critics"]
+
+        # Load fitness critics params
+        if self.use_fc:
+            fitness_critics = self.init_fitness_critics()
+            for fc, params in zip(fitness_critics, fc_params):
+                fc.model.set_params(params)
+
+        # Set fitness csv file to checkpoint
+        new_fit_path = os.path.join(trial_dir, "fitness_edit.csv")
+        with open(fitness_dir, "r") as inp, open(new_fit_path, "w") as out:
+            writer = csv.writer(out)
+            for row in csv.reader(inp):
+                if row[0].isdigit():
+                    gen = int(row[0])
+                    if gen <= checkpoint_gen:
+                        writer.writerow(row)
+                else:
+                    writer.writerow(row)
+
+        # Remove old fitness file
+        os.remove(fitness_dir)
+        # Rename new fitness file
+        os.rename(new_fit_path, fitness_dir)
+
+        return pop, fitness_critics, checkpoint_gen
+
     def run(self):
 
         # Set trial directory name
         trial_folder_name = "_".join(("trial", str(self.trial_id)))
         trial_dir = os.path.join(self.trials_dir, trial_folder_name)
-        eval_fit_dir = f"{trial_dir}/fitness.csv"
+        fitness_dir = f"{trial_dir}/fitness.csv"
         checkpoint_name = os.path.join(trial_dir, "checkpoint.pickle")
 
         # Create directory for saving data
         if not os.path.isdir(trial_dir):
             os.makedirs(trial_dir)
 
-        # Load checkpoint
         checkpoint_exists = Path(checkpoint_name).is_file()
         fitness_critics = None
+        pop = None
 
+        # Load checkpoint
+        checkpoint_gen = 0
         if checkpoint_exists:
 
-            # Load checkpoint file
-            with open(checkpoint_name, "rb") as handle:
-                checkpoint = pickle.load(handle)
-                pop = checkpoint["population"]
-                self.checkpoint_gen = checkpoint["gen"]
-                fc_params = checkpoint["fitness_critics"]
-
-            # Load fitness critics params
-            if self.use_fc:
-                fitness_critics = self.init_fitness_critics()
-                for fc, params in zip(fitness_critics, fc_params):
-                    fc.model.set_params(params)
-
-            # Set fitness csv file to checkpoint
-            new_fit_path = os.path.join(trial_dir, "fitness_edit.csv")
-            with open(eval_fit_dir, "r") as inp, open(new_fit_path, "w") as out:
-                writer = csv.writer(out)
-                for row in csv.reader(inp):
-                    if row[0].isdigit():
-                        gen = int(row[0])
-                        if gen <= self.checkpoint_gen:
-                            writer.writerow(row)
-                    else:
-                        writer.writerow(row)
-
-            # Remove old fitness file
-            os.remove(eval_fit_dir)
-            # Rename new fitness file
-            os.rename(new_fit_path, eval_fit_dir)
+            pop, fitness_critics, checkpoint_gen = self.load_checkpoint(
+                checkpoint_name, fitness_dir, trial_dir, fitness_critics
+            )
 
         else:
             # Initialize the population
             pop = self.toolbox.population()
 
             # Create csv file for saving evaluation fitnesses
-            self.createEvalFitnessCSV(eval_fit_dir)
+            self.createFitnessCSV(fitness_dir)
 
             # Initialize fitness critics
             if self.use_fc:
@@ -644,7 +632,7 @@ class CooperativeCoevolutionaryAlgorithm:
             self.gen = n_gen
 
             # Get loading bar up to checkpoint
-            if checkpoint_exists and n_gen <= self.checkpoint_gen:
+            if checkpoint_exists and n_gen <= checkpoint_gen:
                 continue
 
             # Perform selection
@@ -688,8 +676,8 @@ class CooperativeCoevolutionaryAlgorithm:
             self.setPopulation(pop, offspring)
 
             # Save fitnesses
-            self.writeEvalFitnessCSV(
-                eval_fit_dir, avg_team_fitness, best_team_eval_info.team_fitness
+            self.writeFitnessCSV(
+                fitness_dir, avg_team_fitness, best_team_eval_info.team_fitness
             )
 
             # Save trajectories and checkpoint
@@ -712,60 +700,3 @@ class CooperativeCoevolutionaryAlgorithm:
                         handle,
                         protocol=pickle.HIGHEST_PROTOCOL,
                     )
-
-
-def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int):
-
-    config_dir = os.path.join(batch_dir, f"{experiment_name}.yaml")
-
-    with open(str(config_dir), "r") as file:
-        config = yaml.safe_load(file)
-
-    env_file = os.path.join(batch_dir, "_env.yaml")
-
-    with open(str(env_file), "r") as file:
-        env_config = yaml.safe_load(file)
-
-    ccea = CooperativeCoevolutionaryAlgorithm(
-        batch_dir=batch_dir,
-        trials_dir=Path(batch_dir).parents[1]
-        / "results"
-        / batch_name
-        / experiment_name,
-        trial_id=trial_id,
-        trial_name=Path(config_dir).stem,
-        video_name=f"{experiment_name}_{trial_id}",
-        device="cuda" if torch.cuda.is_available() else "cpu",
-        # Environment Data
-        map_size=env_config["env"]["map_size"],
-        n_steps=config["ccea"]["n_steps"],
-        observation_size=8,
-        action_size=2,
-        # Flags
-        use_teaming=config["use_teaming"],
-        use_fc=config["use_fc"],
-        # Agent data
-        n_agents=len(env_config["env"]["rovers"]),
-        policy_type=config["policy"]["type"],
-        policy_n_hidden=config["policy"]["hidden_layers"],
-        weight_initialization=config["policy"]["weight_initialization"],
-        output_multiplier=config["policy"]["output_multiplier"],
-        # POIs data
-        n_pois=len(env_config["env"]["pois"]),
-        # Learning data
-        n_gens=config["ccea"]["n_gens"],
-        subpop_size=config["ccea"]["subpopulation_size"],
-        selection_method=config["ccea"]["selection"],
-        mutation_mean=config["ccea"]["mutation"]["mean"],
-        max_std_deviation=config["ccea"]["mutation"]["max_std_deviation"],
-        min_std_deviation=config["ccea"]["mutation"]["min_std_deviation"],
-        fitness_shaping_method=config["ccea"]["fitness_shaping"],
-        team_size=config["teaming"]["team_size"],
-        fc_n_epochs=config["fitness_critic"]["epochs"],
-        fc_loss_type=config["fitness_critic"]["loss_type"],
-        fc_type=config["fitness_critic"]["type"],
-        fc_n_hidden=config["fitness_critic"]["hidden_layers"],
-        fitness_calculation=config["ccea"]["fitness_calculation"],
-        n_gens_between_save=config["data"]["n_gens_between_save"],
-    )
-    return ccea.run()
