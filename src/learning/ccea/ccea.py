@@ -19,7 +19,7 @@ from learning.ccea.selection import (
     epsilonGreedySelection,
     softmaxSelection,
 )
-from learning.ccea.custom_types import JointTrajectory, Team, EvalInfo
+from learning.ccea.utils import JointTrajectory, Team, EvalInfo
 
 from copy import deepcopy
 import numpy as np

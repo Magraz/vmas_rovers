@@ -4,7 +4,7 @@
 import os
 import time
 import argparse
-
+import yaml
 import torch
 
 from vmas import make_env
@@ -12,8 +12,11 @@ from vmas.simulator.utils import save_video
 from vmas.simulator.scenario import BaseScenario
 from vmas.simulator.environment import Environment
 
-from domain.rover_domain import RoverDomain, HeuristicPolicy
+from domain.rover_domain import HeuristicPolicy
+from pynput.keyboard import Listener
 from domain.create_env import create_env
+from testing.manual_control import manual_control
+from pathlib import Path
 
 
 def use_vmas_env(
@@ -22,9 +25,10 @@ def use_vmas_env(
     render: bool = False,
     save_render: bool = False,
     n_envs: int = 1,
-    n_steps: int = 600,
+    n_steps: int = 100,
     device: str = "cpu",
     visualize_render: bool = True,
+    use_heuristic: bool = True,
     **kwargs,
 ):
     """Example function to use a vmas environment
@@ -47,69 +51,87 @@ def use_vmas_env(
     frame_list = []  # For creating a gif
     init_time = time.time()
     step = 0
+    n_agents = kwargs.pop("n_agents", 0)
 
-    policy = HeuristicPolicy(continuous_action=True, device=device)
+    mc = manual_control(n_agents)
+    policy = HeuristicPolicy(
+        continuous_action=True,
+        device=device,
+        targets_positions=kwargs.pop("targets_positions", []),
+    )
+
     G_total = torch.zeros((n_agents, n_envs)).to(device)
     D_total = torch.zeros((n_agents, n_envs)).to(device)
     G_list = []
     D_list = []
     obs_list = []
 
-    for step in range(n_steps):
-        step += 1
+    with Listener(on_press=mc.on_press, on_release=mc.on_release) as listener:
 
-        actions = []
+        listener.join(timeout=1)
 
-        for agent in env.agents:
+        for step in range(n_steps):
+            step += 1
 
-            action = policy.compute_action(
-                agent_position=agent.state.pos,
-                observation=env.scenario.observation(agent),
-                u_range=agent.action.u_range,
-            )
+            actions = []
 
-            actions.append(action)
+            for i, agent in enumerate(env.agents):
 
-        obs, rews, dones, info = env.step(actions)
-        temp = [g[:n_envs] for g in rews]
+                if use_heuristic:
+                    action = policy.compute_action(
+                        agent_position=agent.state.pos,
+                        observation=env.scenario.observation(agent),
+                        u_range=agent.action.u_range,
+                    )
+                else:
+                    if i == mc.controlled_agent:
+                        action = torch.tensor(mc.command).repeat(n_envs, 1)
+                    else:
+                        action = torch.tensor([0.0, 0.0]).repeat(n_envs, 1)
 
-        obs_list.append(obs[0][0])
+                actions.append(action)
 
-        G_list.append(torch.stack([g[:n_envs] for g in rews], dim=0)[0])
-        D_list.append(torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0))
+            obs, rews, dones, info = env.step(actions)
+            temp = [g[:n_envs] for g in rews]
 
-        G_total += torch.stack([g[:n_envs] for g in rews], dim=0)
-        D_total += torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
+            obs_list.append(obs[0][0])
 
-        G = torch.stack([g[:n_envs] for g in rews], dim=0)
-        D = torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
+            G_list.append(torch.stack([g[:n_envs] for g in rews], dim=0)[0])
+            D_list.append(torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0))
 
-        if any(tensor.any() for tensor in rews):
-            print("G")
-            print(G)
-            print("D")
-            print(D)
+            G_total += torch.stack([g[:n_envs] for g in rews], dim=0)
+            D_total += torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
 
-            print("Total G")
-            print(G_total)
-            print("Total D")
-            print(D_total)
+            G = torch.stack([g[:n_envs] for g in rews], dim=0)
+            D = torch.stack([g[n_envs : n_envs * 2] for g in rews], dim=0)
 
-        if render:
-            frame = env.render(
-                mode="rgb_array",
-                agent_index_focus=None,  # Can give the camera an agent index to focus on
-                visualize_when_rgb=visualize_render,
-            )
-            if save_render:
-                frame_list.append(frame)
+            if any(tensor.any() for tensor in rews):
+                print("G")
+                print(G)
+                print("D")
+                print(D)
 
-    print("G List Agg")
-    G_agg = torch.sum(torch.stack(G_list), dim=0)
-    print(G_agg)
-    print("D List Agg")
-    D_agg = torch.sum(torch.stack(D_list), dim=0)
-    print(torch.transpose(D_agg, dim0=0, dim1=1))
+                # print("Total G")
+                # print(G_total)
+                # print("Total D")
+                # print(D_total)
+                pass
+
+            if render:
+                frame = env.render(
+                    mode="rgb_array",
+                    agent_index_focus=None,  # Can give the camera an agent index to focus on
+                    visualize_when_rgb=visualize_render,
+                )
+                if save_render:
+                    frame_list.append(frame)
+
+    # print("G List Agg")
+    # G_agg = torch.sum(torch.stack(G_list), dim=0)
+    # print(G_agg)
+    # print("D List Agg")
+    # D_agg = torch.sum(torch.stack(D_list), dim=0)
+    # print(torch.transpose(D_agg, dim0=0, dim1=1))
     # print("Obs List")
     # print(obs_list)
 
@@ -132,18 +154,17 @@ def use_vmas_env(
 if __name__ == "__main__":
     # Arg parser variables
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
-        "--hpc", default=False, help="use hpc config files", action="store_true"
-    )
-    parser.add_argument(
-        "--load_checkpoint", default=False, help="loads checkpoint", action="store_true"
-    )
-    parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
-    parser.add_argument("--model", default="mlp", help="mlp/gru/cnn/att", type=str)
-    parser.add_argument(
-        "--experiment_type",
+        "--batch",
         default="",
-        help="standard/fitness_critic/teaming",
+        help="Experiment batch",
+        type=str,
+    )
+    parser.add_argument(
+        "--name",
+        default="",
+        help="Experiment name",
         type=str,
     )
     parser.add_argument("--trial_id", default=0, help="Sets trial ID", type=int)
@@ -151,27 +172,40 @@ if __name__ == "__main__":
     args = vars(parser.parse_args())
 
     # Set base_config path
-    dir_path = os.path.dirname(os.path.realpath(__file__))
+    dir_path = Path(__file__).parent
 
-    config_dir = os.path.join(dir_path, "experiments", "yamls", args["experiment_type"])
+    # Set configuration folder
+    batch_dir = dir_path / "experiments" / "yamls" / args["batch"]
 
-    # Set configuration file
-    yaml_filename = "_".join((args["poi_type"], args["model"])) + ".yaml"
-    config_dir = os.path.join(config_dir, yaml_filename)
+    env_file = os.path.join(batch_dir, "_env.yaml")
 
-    n_agents = 3
-    n_envs = 5
+    with open(str(env_file), "r") as file:
+        env_config = yaml.safe_load(file)
+
+    # Environment data
+    map_size = env_config["env"]["map_size"]
+
+    # Agent data
+    n_agents = len(env_config["env"]["rovers"])
+    agents_positions = [poi["position"]["fixed"] for poi in env_config["env"]["rovers"]]
+    lidar_range = [rover["observation_radius"] for rover in env_config["env"]["rovers"]]
+
+    # POIs data
+    poi_positions = [poi["position"]["fixed"] for poi in env_config["env"]["pois"]]
+    n_envs = 3
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     use_vmas_env(
-        name=f"RoverDomain_{n_agents}a",
-        env=create_env(config_dir=config_dir, n_envs=n_envs, device=device),
+        name=f"{args["batch"]}_{n_agents}a",
+        env=create_env(batch_dir=batch_dir, n_envs=n_envs, device=device),
         render=True,
         save_render=False,
         continuous_action=True,
-        device="cuda",
+        device=device,
         n_envs=n_envs,
-        # Environment specific
+        n_steps=10000,
+        # kwargs
         n_agents=n_agents,
-        n_steps=200,
+        targets_positions=poi_positions,
+        use_heuristic=False,
     )

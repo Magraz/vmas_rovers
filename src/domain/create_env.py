@@ -20,6 +20,10 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
 
     # Agent data
     n_agents = len(env_config["env"]["rovers"])
+    agents_colors = [
+        agent["color"] if agent.get("color") else "BLUE"
+        for agent in env_config["env"]["rovers"]
+    ]
     agents_positions = [poi["position"]["fixed"] for poi in env_config["env"]["rovers"]]
     lidar_range = [rover["observation_radius"] for rover in env_config["env"]["rovers"]]
 
@@ -29,7 +33,10 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
     poi_values = [poi["value"] for poi in env_config["env"]["pois"]]
     poi_types = [poi["type"] for poi in env_config["env"]["pois"]]
     poi_orders = [poi["order"] for poi in env_config["env"]["pois"]]
-    poi_colors = [poi["color"] for poi in env_config["env"]["pois"]]
+    poi_colors = [
+        poi["color"] if poi.get("color") else "GREEN"
+        for poi in env_config["env"]["pois"]
+    ]
     coupling = [poi["coupling"] for poi in env_config["env"]["pois"]]
     obs_radius = [poi["observation_radius"] for poi in env_config["env"]["pois"]]
     use_order = env_config["env"]["use_order"]
@@ -44,6 +51,7 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
         n_agents=n_agents,
         n_targets=n_pois,
         agents_positions=agents_positions,
+        agents_colors=agents_colors,
         targets_positions=poi_positions,
         targets_values=poi_values,
         targets_colors=poi_colors,
@@ -55,7 +63,7 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
         targets_types=poi_types,
         targets_orders=poi_orders,
         use_order=use_order,
-        viewer_zoom=kwargs.pop("viewer_zoom", 1)
+        viewer_zoom=kwargs.pop("viewer_zoom", 1),
     )
 
     return env

@@ -6,7 +6,7 @@ teaming:
   team_size: 0
 
 fitness_critic:
-    epochs: 1
+    epochs: 10
     type: MLP
     loss_type: MSE+MAE
     hidden_layers: [80,80]
@@ -32,7 +32,7 @@ ccea:
     min_std_deviation: 0.05
     max_std_deviation: 0.25
 
-  n_steps: 80
+  n_steps: 100
   n_gens: 5000
 
 data:

@@ -12,19 +12,13 @@ from vmas import render_interactively
 from vmas.simulator.core import Agent, Landmark, Sphere, World
 from vmas.simulator.heuristic_policy import BaseHeuristicPolicy
 from vmas.simulator.scenario import BaseScenario
-from vmas.simulator.utils import Color, ScenarioUtils
+from vmas.simulator.utils import ScenarioUtils
 
 if typing.TYPE_CHECKING:
     from vmas.simulator.rendering import Geom
 
 from domain.custom_sensors import SectorDensity
-
-COLOR_MAP = {
-    "GREEN": Color.GREEN,
-    "RED": Color.RED,
-    "BLUE": Color.BLUE,
-    "BLACK": Color.BLACK,
-}
+from domain.utils import COLOR_MAP
 
 
 class RoverDomain(BaseScenario):
@@ -36,6 +30,7 @@ class RoverDomain(BaseScenario):
         self.viewer_zoom = kwargs.pop("viewer_zoom", 1)
 
         self.n_agents = kwargs.pop("n_agents", 5)
+        self.agents_colors = kwargs.pop("agents_colors", [])
         self.n_targets = kwargs.pop("n_targets", 7)
         self.use_order = kwargs.pop("use_order", False)
         self.targets_positions = kwargs.pop("targets_positions", [])
@@ -106,6 +101,7 @@ class RoverDomain(BaseScenario):
                 collide=False,
                 shape=Sphere(radius=self.agent_radius),
                 sensors=([SectorDensity(world, max_range=self._lidar_range)]),
+                color=COLOR_MAP[self.agents_colors[i]],
             )
             agent.difference_rew = torch.zeros(batch_dim, device=device)
             world.add_agent(agent)
@@ -290,8 +286,11 @@ class RoverDomain(BaseScenario):
             self.global_rew = self.calculate_global_reward(targets_pos, agent)
 
             # Calculate D
-            for me in self.world.agents:
-                me.difference_rew = self.calculate_difference_reward(targets_pos, me)
+            if len(self.world.agents) > 1:  # Can't calculate D with a team of 1 agent
+                for me in self.world.agents:
+                    me.difference_rew = self.calculate_difference_reward(
+                        targets_pos, me
+                    )
 
         if is_last:
             self.all_time_covered_targets += self.covered_targets
@@ -347,7 +346,7 @@ class RoverDomain(BaseScenario):
 
 
 class HeuristicPolicy(BaseHeuristicPolicy):
-    def __init__(self, continuous_action, device):
+    def __init__(self, continuous_action, device, targets_positions):
 
         super().__init__(continuous_action)
 
@@ -357,9 +356,7 @@ class HeuristicPolicy(BaseHeuristicPolicy):
             0, self.theta_max, step=self.theta_max / 600
         ).to(device)
 
-        self.targets = torch.tensor(
-            [[-0.5, -0.5], [-0.5, 0.5], [0.5, 0.5], [0.5, -0.5]], device=device
-        )
+        self.targets = torch.tensor(targets_positions, device=device)
         self.current_target = 0
 
     def compute_action(
@@ -385,7 +382,7 @@ class HeuristicPolicy(BaseHeuristicPolicy):
 
         dist_to_target = torch.cdist(des_pos, agent_position) ** 2
 
-        if dist_to_target[0, 0] < 0.02:
+        if dist_to_target[0, 0] < 0.01:
             self.current_target += 1
 
         return action
