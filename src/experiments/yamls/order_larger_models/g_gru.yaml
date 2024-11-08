@@ -1,12 +1,6 @@
 use_teaming: False
 use_fc: False
 
-fitness_critic:
-    epochs: 1
-    type: MLP
-    loss_type: MSE+MAE
-    hidden_layers: [80,80]
-
 policy:
     weight_initialization: kaiming
     type: GRU
@@ -28,7 +22,7 @@ ccea:
     min_std_deviation: 0.05
     max_std_deviation: 0.5
 
-  n_steps: 120
+  n_steps: 80
   n_gens: 5000
 
 data:

@@ -17,18 +17,18 @@ env:
         spawn_rule: fixed
         fixed: [0.0, 0.0]
     
-    # - observation_radius: 1
-    #   type: 0
-    #   color: "WHITE"
-    #   position:
-    #     spawn_rule: fixed
-    #     fixed: [0.0, 0.0]
+    - observation_radius: 1
+      type: 0
+      color: "WHITE"
+      position:
+        spawn_rule: fixed
+        fixed: [0.0, 0.0]
 
-    # - observation_radius: 1
-    #   type: 0
-    #   position:
-    #     spawn_rule: fixed
-    #     fixed: [0.0, 0.0]
+    - observation_radius: 1
+      type: 0
+      position:
+        spawn_rule: fixed
+        fixed: [0.0, 0.0]
     
     # - observation_radius: 1
     #   type: 0
@@ -84,7 +84,6 @@ env:
       position:
         spawn_rule: fixed
         fixed: [0.5, -0.25]
-    
     
     # - value: 1.0
     #   coupling: 2

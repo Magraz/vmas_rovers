@@ -1,7 +1,7 @@
 #Experiment config
-batch_name: "static_spread"
-experiment_names: ["d_gru", "d_mlp", "g_mlp", "g_gru", "mlp_fc_mlp", "mlp_fc_gru"]
+batch_name: "order"
+experiment_names: ["d_gru", "d_mlp", "g_mlp", "g_gru"]
 trials_start: 0
 trials_finish: 10
-data_points: 3400
-moving_avg_window_size: 10
+data_points: 4400
+moving_avg_window_size: 50
