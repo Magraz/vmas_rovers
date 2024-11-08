@@ -17,7 +17,7 @@ Run the following command for running experiments in different modalities:
 
 Run N number of trials in parallel (Requires GNU Parallel Package)
 
-- `parallel ./src/run_trial.sh ::: $(seq 0 N)`
+- `parallel bash src/run_trial.sh order d_gru ::: $(seq 0 N)`
 
 
 
