@@ -7,13 +7,13 @@ import yaml
 
 sys.path.insert(0, "./src")
 
-from learning.ccea import CooperativeCoevolutionaryAlgorithm
+from learning.ccea.ccea import CooperativeCoevolutionaryAlgorithm
 from domain.create_env import create_env
 
-batch_name = "static_spread"
+batch_name = "order"
 experiment_name = "d_gru"
 trial_id = 0
-checkpoint_path = f"./src/tests/checkpoint.pickle"
+checkpoint_path = f"./src/testing/checkpoint.pickle"
 batch_dir = f"./src/experiments/yamls/{batch_name}"
 config_dir = os.path.join(batch_dir, f"{experiment_name}.yaml")
 
