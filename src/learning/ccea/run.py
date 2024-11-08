@@ -51,7 +51,6 @@ def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int
         max_std_deviation=config["ccea"]["mutation"]["max_std_deviation"],
         min_std_deviation=config["ccea"]["mutation"]["min_std_deviation"],
         fitness_shaping_method=config["ccea"]["fitness_shaping"],
-        team_size=config["teaming"]["team_size"],
         fc_n_epochs=config["fitness_critic"]["epochs"],
         fc_loss_type=config["fitness_critic"]["loss_type"],
         fc_type=config["fitness_critic"]["type"],

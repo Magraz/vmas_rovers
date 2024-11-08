@@ -77,9 +77,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.fc_n_hidden = kwargs.pop("fc_n_hidden", 0)
         self.fc_n_epochs = kwargs.pop("fc_n_epochs", 0)
 
-        self.team_size = (
-            kwargs.pop("team_size", 0) if self.use_teaming else self.n_agents
-        )
+        self.team_size = self.n_agents
         self.team_combinations = [
             combo for combo in combinations(range(self.n_agents), self.team_size)
         ]
