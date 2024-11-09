@@ -5,7 +5,9 @@ Run the following commands inside `/vmas_rovers` after cloning:
 2. `git submodule update`
 3. `cd VectorizedMultiAgentSimulator`
 4. `pip install -e .`
-5. `pip install -r requirements.txt`
+5. `cd vmas_rovers`
+6. `pip install -e .`
+7. `pip install -r requirements.txt`
 
 
 
