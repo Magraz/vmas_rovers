@@ -16,30 +16,29 @@ def create_env(batch_dir, n_envs: int, device: str, **kwargs) -> Environment:
         env_config = yaml.safe_load(file)
 
     # Environment data
-    map_size = env_config["env"]["map_size"]
+    map_size = env_config["map_size"]
 
     # Agent data
-    n_agents = len(env_config["env"]["rovers"])
+    n_agents = len(env_config["rovers"])
     agents_colors = [
         agent["color"] if agent.get("color") else "BLUE"
-        for agent in env_config["env"]["rovers"]
+        for agent in env_config["rovers"]
     ]
-    agents_positions = [poi["position"]["fixed"] for poi in env_config["env"]["rovers"]]
-    lidar_range = [rover["observation_radius"] for rover in env_config["env"]["rovers"]]
+    agents_positions = [poi["position"]["coordinates"] for poi in env_config["rovers"]]
+    lidar_range = [rover["observation_radius"] for rover in env_config["rovers"]]
 
     # POIs data
-    n_pois = len(env_config["env"]["pois"])
-    poi_positions = [poi["position"]["fixed"] for poi in env_config["env"]["pois"]]
-    poi_values = [poi["value"] for poi in env_config["env"]["pois"]]
-    poi_types = [poi["type"] for poi in env_config["env"]["pois"]]
-    poi_orders = [poi["order"] for poi in env_config["env"]["pois"]]
+    n_pois = len(env_config["pois"])
+    poi_positions = [poi["position"]["coordinates"] for poi in env_config["pois"]]
+    poi_values = [poi["value"] for poi in env_config["pois"]]
+    poi_types = [poi["type"] for poi in env_config["pois"]]
+    poi_orders = [poi["order"] for poi in env_config["pois"]]
     poi_colors = [
-        poi["color"] if poi.get("color") else "GREEN"
-        for poi in env_config["env"]["pois"]
+        poi["color"] if poi.get("color") else "GREEN" for poi in env_config["pois"]
     ]
-    coupling = [poi["coupling"] for poi in env_config["env"]["pois"]]
-    obs_radius = [poi["observation_radius"] for poi in env_config["env"]["pois"]]
-    use_order = env_config["env"]["use_order"]
+    coupling = [poi["coupling"] for poi in env_config["pois"]]
+    obs_radius = [poi["observation_radius"] for poi in env_config["pois"]]
+    use_order = env_config["use_order"]
 
     # Set up the enviornment
     env = make_env(

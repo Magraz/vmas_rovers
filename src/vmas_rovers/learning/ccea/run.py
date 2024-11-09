@@ -2,8 +2,9 @@ import os
 import yaml
 import torch
 from pathlib import Path
-from learning.ccea.ccea import CooperativeCoevolutionaryAlgorithm
-from learning.ccea.dataclasses import ExperimentConfig, EnvironmentConfig
+from vmas_rovers.learning.ccea.ccea import CooperativeCoevolutionaryAlgorithm
+from vmas_rovers.learning.ccea.dataclasses import ExperimentConfig, EnvironmentConfig
+from dataclasses import asdict
 
 
 def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int):
@@ -11,7 +12,7 @@ def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int
     exp_file = os.path.join(batch_dir, f"{experiment_name}.yaml")
 
     with open(str(exp_file), "r") as file:
-        exp_dict = yaml.safe_load(file)
+        exp_dict = yaml.unsafe_load(file)
 
     env_file = os.path.join(batch_dir, "_env.yaml")
 
@@ -38,6 +39,6 @@ def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int
         n_agents=len(env_config.rovers),
         n_pois=len(env_config.pois),
         # Experiment Data
-        **exp_config,
+        **asdict(exp_config),
     )
     return ccea.run()

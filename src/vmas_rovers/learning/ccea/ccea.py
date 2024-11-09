@@ -57,6 +57,8 @@ class CooperativeCoevolutionaryAlgorithm:
         fc_config: FitnessCriticConfig,
         **kwargs,
     ):
+        policy_config = PolicyConfig(**policy_config)
+        ccea_config = CCEAConfig(**ccea_config)
 
         self.batch_dir = batch_dir
         self.trials_dir = trials_dir
@@ -67,7 +69,6 @@ class CooperativeCoevolutionaryAlgorithm:
         # Environment data
         self.device = device
         self.map_size = kwargs.pop("map_size", [])
-        self.n_steps = kwargs.pop("n_steps", 0)
         self.observation_size = kwargs.pop("observation_size", 0)
         self.action_size = kwargs.pop("action_size", 0)
         self.n_agents = kwargs.pop("n_agents", 0)
@@ -85,22 +86,25 @@ class CooperativeCoevolutionaryAlgorithm:
         self.policy_hidden_layers = policy_config.hidden_layers
         self.policy_type = policy_config.type
         self.weight_initialization = policy_config.weight_initialization
+
         # CCEA
         self.n_gens = ccea_config.n_gens
+        self.n_steps = ccea_config.n_steps
+        self.subpop_size = ccea_config.subpopulation_size
         self.n_mutants = self.subpop_size // 2
         self.selection_method = ccea_config.selection
-        self.subpop_size = ccea_config.subpopulation_size
         self.fitness_shaping_method = ccea_config.fitness_shaping
         self.fitness_calculation = ccea_config.fitness_calculation
         self.max_std_dev = ccea_config.mutation["max_std_deviation"]
         self.min_std_dev = ccea_config.mutation["min_std_deviation"]
-        self.mutation_mean = ccea_config.mutation["mut_mean"]
-        # Fitness Critics
+        self.mutation_mean = ccea_config.mutation["mean"]
 
-        self.fc_loss_type = fc_config.loss_type
-        self.fc_type = fc_config.type
-        self.fc_n_hidden = fc_config.hidden_layers
-        self.fc_n_epochs = fc_config.epochs
+        # Fitness Critics
+        if fc_config:
+            self.fc_loss_type = fc_config.loss_type
+            self.fc_type = fc_config.type
+            self.fc_n_hidden = fc_config.hidden_layers
+            self.fc_n_epochs = fc_config.epochs
 
         self.team_size = self.n_agents
         self.team_combinations = [
