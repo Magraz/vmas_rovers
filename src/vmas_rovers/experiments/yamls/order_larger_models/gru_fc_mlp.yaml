@@ -1,5 +1,6 @@
-use_teaming: False
-use_fc: True
+flags:
+  use_teaming: False
+  use_fc: True
 
 fitness_critic:
     epochs: 10

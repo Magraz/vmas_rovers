@@ -19,7 +19,8 @@ from learning.ccea.selection import (
     epsilonGreedySelection,
     softmaxSelection,
 )
-from learning.ccea.utils import JointTrajectory, Team, EvalInfo
+from learning.ccea.types import JointTrajectory, Team, EvalInfo
+from learning.ccea.dataclasses import CCEAConfig, PolicyConfig, FitnessCriticConfig
 
 from copy import deepcopy
 import numpy as np
@@ -43,64 +44,68 @@ logger.setLevel(logging.INFO)
 
 
 class CooperativeCoevolutionaryAlgorithm:
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        batch_dir: str,
+        trials_dir: str,
+        trial_id: int,
+        trial_name: str,
+        video_name: str,
+        device: str,
+        ccea_config: CCEAConfig,
+        policy_config: PolicyConfig,
+        fc_config: FitnessCriticConfig,
+        **kwargs,
+    ):
 
-        self.batch_dir = kwargs.pop("batch_dir", None)
-        self.trials_dir = kwargs.pop("trials_dir", None)
-        self.trial_id = kwargs.pop("trial_id", 0)
-        self.video_name = kwargs.pop("video_name", None)
-
-        # Experiment data
-        self.trial_name = kwargs.pop("trial_name", None)
+        self.batch_dir = batch_dir
+        self.trials_dir = trials_dir
+        self.trial_name = trial_name
+        self.trial_id = trial_id
+        self.video_name = video_name
 
         # Environment data
+        self.device = device
         self.map_size = kwargs.pop("map_size", [])
         self.n_steps = kwargs.pop("n_steps", 0)
         self.observation_size = kwargs.pop("observation_size", 0)
         self.action_size = kwargs.pop("action_size", 0)
-
-        # Agent data
         self.n_agents = kwargs.pop("n_agents", 0)
-        self.output_multiplier = kwargs.pop("output_multiplier", 0)
-
-        # POIs data
         self.n_pois = kwargs.pop("n_pois", 0)
 
-        # Learning data
-        self.device = kwargs.pop("device", None)
+        # Experiment Data
+        self.n_gens_between_save = kwargs.pop("n_gens_between_save", 0)
 
+        # Flags
         self.use_teaming = kwargs.pop("use_teaming", False)
-
         self.use_fc = kwargs.pop("use_fc", False)
-        self.fc_loss_type = kwargs.pop("fc_loss_type", 0)
-        self.fc_type = kwargs.pop("fc_type", 0)
-        self.fc_n_hidden = kwargs.pop("fc_n_hidden", 0)
-        self.fc_n_epochs = kwargs.pop("fc_n_epochs", 0)
+
+        # Policy
+        self.output_multiplier = policy_config.output_multiplier
+        self.policy_hidden_layers = policy_config.hidden_layers
+        self.policy_type = policy_config.type
+        self.weight_initialization = policy_config.weight_initialization
+        # CCEA
+        self.n_gens = ccea_config.n_gens
+        self.n_mutants = self.subpop_size // 2
+        self.selection_method = ccea_config.selection
+        self.subpop_size = ccea_config.subpopulation_size
+        self.fitness_shaping_method = ccea_config.fitness_shaping
+        self.fitness_calculation = ccea_config.fitness_calculation
+        self.max_std_dev = ccea_config.mutation["max_std_deviation"]
+        self.min_std_dev = ccea_config.mutation["min_std_deviation"]
+        self.mutation_mean = ccea_config.mutation["mut_mean"]
+        # Fitness Critics
+
+        self.fc_loss_type = fc_config.loss_type
+        self.fc_type = fc_config.type
+        self.fc_n_hidden = fc_config.hidden_layers
+        self.fc_n_epochs = fc_config.epochs
 
         self.team_size = self.n_agents
         self.team_combinations = [
             combo for combo in combinations(range(self.n_agents), self.team_size)
         ]
-
-        self.fitness_shaping_method = kwargs.pop("fitness_shaping_method", None)
-
-        self.subpop_size = kwargs.pop("subpop_size", 0)
-
-        self.policy_n_hidden = kwargs.pop("policy_n_hidden", [])
-        self.policy_type = kwargs.pop("policy_type", None)
-        self.weight_initialization = kwargs.pop("weight_initialization", None)
-
-        self.n_mutants = self.subpop_size // 2
-
-        self.fitness_calculation = kwargs.pop("fitness_calculation", None)
-
-        self.n_gens = kwargs.pop("n_gens", 0)
-
-        self.selection_method = kwargs.pop("selection_method", 0)
-
-        self.max_std_dev = kwargs.pop("max_std_deviation", 0)
-        self.min_std_dev = kwargs.pop("min_std_deviation", 0)
-        self.mutation_mean = kwargs.pop("mut_mean", 0)
 
         self.std_dev_list = np.arange(
             start=self.max_std_dev,
@@ -111,9 +116,6 @@ class CooperativeCoevolutionaryAlgorithm:
         # HOF Alpha Decay
         self.alpha = 0.0
         self.alpha_max = 0.5
-
-        # Data saving variables
-        self.n_gens_between_save = kwargs.pop("n_gens_between_save", 0)
 
         # Create the type of fitness we're optimizing
         creator.create("Individual", np.ndarray, fitness=0.0)
@@ -150,7 +152,7 @@ class CooperativeCoevolutionaryAlgorithm:
             case "GRU":
                 agent_nn = GRU_Policy(
                     input_size=self.observation_size,
-                    hidden_size=self.policy_n_hidden[0],
+                    hidden_size=self.policy_hidden_layers[0],
                     output_size=self.action_size,
                     n_layers=1,
                 ).to(self.device)
@@ -163,8 +165,8 @@ class CooperativeCoevolutionaryAlgorithm:
             case "MLP":
                 agent_nn = MLP_Policy(
                     input_size=self.observation_size,
-                    hidden_layers=len(self.policy_n_hidden),
-                    hidden_size=self.policy_n_hidden[0],
+                    hidden_layers=len(self.policy_hidden_layers),
+                    hidden_size=self.policy_hidden_layers[0],
                     output_size=self.action_size,
                 ).to(self.device)
 

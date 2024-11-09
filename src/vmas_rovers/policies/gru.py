@@ -40,7 +40,7 @@ class GRU_Policy(nn.Module):  # inheriting from nn.Module!
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = GRU_Policy(input_size=8, hidden_size=12, output_size=2, n_layers=1).to(
+    model = GRU_Policy(input_size=8, hidden_size=17, output_size=2, n_layers=1).to(
         device
     )
     model_copy = deepcopy(model)

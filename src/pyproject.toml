@@ -1,0 +1,4 @@
+[project]
+name = "vmas_rovers"
+version = "0.1.0"
+description = "VMAS ROVERS"

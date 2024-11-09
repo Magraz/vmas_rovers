@@ -1,5 +1,11 @@
-use_teaming: False
-use_fc: False
+flags:
+  use_teaming: False
+  use_fc: True
+fitness_critic:
+    epochs: 10
+    type: MLP
+    loss_type: MSE+MAE
+    hidden_layers: [80,80]
 
 policy:
     weight_initialization: kaiming
@@ -9,7 +15,7 @@ policy:
 
 ccea:
 
-  fitness_shaping: global
+  fitness_shaping: fitness_critics
 
   selection: softmax
 
@@ -22,7 +28,7 @@ ccea:
     min_std_deviation: 0.05
     max_std_deviation: 0.5
 
-  n_steps: 80
+  n_steps: 120
   n_gens: 5000
 
 data:

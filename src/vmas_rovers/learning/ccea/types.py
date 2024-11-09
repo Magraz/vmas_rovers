@@ -1,4 +1,7 @@
-class Team(object):
+from enum import StrEnum
+
+
+class Team:
     def __init__(
         self,
         idx: int,
@@ -10,13 +13,13 @@ class Team(object):
         self.combination = combination if combination is not None else []
 
 
-class JointTrajectory(object):
+class JointTrajectory:
     def __init__(self, joint_state_traj: list, joint_obs_traj: list):
         self.states = joint_state_traj
         self.observations = joint_obs_traj
 
 
-class EvalInfo(object):
+class EvalInfo:
     def __init__(
         self,
         team: Team,
@@ -28,3 +31,28 @@ class EvalInfo(object):
         self.agent_fitnesses = agent_fitnesses
         self.team_fitness = team_fitness
         self.joint_traj = joint_traj
+
+
+class InitializationEnum(StrEnum):
+    KAIMING = "kaiming"
+
+
+class PolicyEnum(StrEnum):
+    GRU = "GRU"
+    MLP = "MLP"
+
+
+class FitnessShapingEnum(StrEnum):
+    D = "difference"
+    G = "global"
+    HOF = "hof_difference"
+
+
+class SelectionEnum(StrEnum):
+    SOFTMAX = "softmax"
+    EPSILON = "epsilon"
+
+
+class FitnessCalculationEnum(StrEnum):
+    AGG = "aggregate"
+    LAST = "last_step"
