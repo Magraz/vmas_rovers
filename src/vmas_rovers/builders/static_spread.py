@@ -1,5 +1,9 @@
-from learning.ccea.dataclasses import ExperimentConfig, PolicyConfig, CCEAConfig
-from learning.ccea.types import (
+from vmas_rovers.learning.ccea.dataclasses import (
+    ExperimentConfig,
+    PolicyConfig,
+    CCEAConfig,
+)
+from vmas_rovers.learning.ccea.types import (
     FitnessShapingEnum,
     FitnessCalculationEnum,
     SelectionEnum,
@@ -8,10 +12,8 @@ from learning.ccea.types import (
 )
 
 from dataclasses import asdict
-import yaml
-from pathlib import Path
 
-BATCH = "order_larger_model"
+BATCH = "static_spread"
 EXPERIMENTS = ["d_gru", "d_mlp", "g_gru", "g_mlp"]
 
 # DEFAULTS
@@ -19,10 +21,14 @@ N_STEPS = 80
 N_GENS = 5000
 SUBPOP_SIZE = 100
 N_GENS_BETWEEN_SAVE = 20
-GRU_NEURONS = 17
-MLP_NEURONS = 32
+GRU_NEURONS = 12
+MLP_NEURONS = 23
 OUTPUT_MULTIPLIER = 1.0
 WEIGHT_INITIALIZATION = InitializationEnum.KAIMING
+FITNESS_CALC = FitnessCalculationEnum.LAST
+MEAN = 0.0
+MIN_STD_DEV = 0.05
+MAX_STD_DEV = 0.25
 
 GRU_POLICY_CONFIG = PolicyConfig(
     type=PolicyEnum.GRU,
@@ -44,8 +50,12 @@ D_CCEA = CCEAConfig(
     fitness_shaping=FitnessShapingEnum.D,
     selection=SelectionEnum.SOFTMAX,
     subpopulation_size=SUBPOP_SIZE,
-    fitness_calculation=FitnessCalculationEnum.AGG,
-    mutation={"mean": 0.0, "min_std_deviation": 0.05, "max_std_deviation": 0.5},
+    fitness_calculation=FITNESS_CALC,
+    mutation={
+        "mean": MEAN,
+        "min_std_deviation": MIN_STD_DEV,
+        "max_std_deviation": MAX_STD_DEV,
+    },
 )
 
 G_CCEA = CCEAConfig(
@@ -54,12 +64,16 @@ G_CCEA = CCEAConfig(
     fitness_shaping=FitnessShapingEnum.D,
     selection=SelectionEnum.SOFTMAX,
     subpopulation_size=SUBPOP_SIZE,
-    fitness_calculation=FitnessCalculationEnum.AGG,
-    mutation={"mean": 0.0, "min_std_deviation": 0.05, "max_std_deviation": 0.5},
+    fitness_calculation=FITNESS_CALC,
+    mutation={
+        "mean": MEAN,
+        "min_std_deviation": MIN_STD_DEV,
+        "max_std_deviation": MAX_STD_DEV,
+    },
 )
 
 # EXPERIMENTS
-d_gru = ExperimentConfig(
+D_GRU = ExperimentConfig(
     use_teaming=False,
     use_fc=False,
     n_gens_between_save=N_GENS_BETWEEN_SAVE,
@@ -67,7 +81,7 @@ d_gru = ExperimentConfig(
     ccea_config=D_CCEA,
 )
 
-d_mlp = ExperimentConfig(
+D_MLP = ExperimentConfig(
     use_teaming=False,
     use_fc=False,
     n_gens_between_save=N_GENS_BETWEEN_SAVE,
@@ -75,7 +89,7 @@ d_mlp = ExperimentConfig(
     ccea_config=D_CCEA,
 )
 
-g_mlp = ExperimentConfig(
+G_MLP = ExperimentConfig(
     use_teaming=False,
     use_fc=False,
     n_gens_between_save=N_GENS_BETWEEN_SAVE,
@@ -83,7 +97,7 @@ g_mlp = ExperimentConfig(
     ccea_config=G_CCEA,
 )
 
-g_gru = ExperimentConfig(
+G_GRU = ExperimentConfig(
     use_teaming=False,
     use_fc=False,
     n_gens_between_save=N_GENS_BETWEEN_SAVE,
@@ -91,16 +105,10 @@ g_gru = ExperimentConfig(
     ccea_config=G_CCEA,
 )
 
-experiments_dicts = {
-    {"name": "d_gru", "config": asdict(d_gru)},
-    {"name": "d_mlp", "config": asdict(d_mlp)},
-    {"name": "g_gru", "config": asdict(g_gru)},
-    {"name": "g_mlp", "config": asdict(g_mlp)},
-}
 
-dir_path = Path(__file__).parent / "yamls" / BATCH
-
-for exp_dict in experiments_dicts:
-
-    with open(dir_path / f"{exp_dict["name"]}.yaml", "w") as file:
-        yaml.dump(exp_dict["config"], file)
+EXP_DICTS = [
+    {"name": "d_gru", "config": asdict(D_GRU)},
+    {"name": "d_mlp", "config": asdict(D_MLP)},
+    {"name": "g_gru", "config": asdict(G_GRU)},
+    {"name": "g_mlp", "config": asdict(G_MLP)},
+]
