@@ -21,6 +21,14 @@ from learning.ccea.selection import (
 )
 from learning.ccea.types import JointTrajectory, Team, EvalInfo
 from learning.ccea.dataclasses import CCEAConfig, PolicyConfig, FitnessCriticConfig
+from learning.ccea.types import (
+    PolicyEnum,
+    SelectionEnum,
+    FitnessShapingEnum,
+    InitializationEnum,
+    FitnessErrorEnum,
+    FitnessCalculationEnum,
+)
 
 from copy import deepcopy
 import numpy as np
@@ -145,7 +153,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def createIndividual(self):
         match (self.weight_initialization):
-            case "kaiming":
+            case InitializationEnum.KAIMING:
                 temp_model = self.generateTemplateNN()
                 params = temp_model.get_params()
         return creator.Individual(params[:].cpu().numpy().astype(np.float32))
@@ -153,7 +161,7 @@ class CooperativeCoevolutionaryAlgorithm:
     def generateTemplateNN(self):
         match (self.policy_type):
 
-            case "GRU":
+            case PolicyEnum.GRU:
                 agent_nn = GRU_Policy(
                     input_size=self.observation_size,
                     hidden_size=self.policy_hidden_layers[0],
@@ -161,12 +169,12 @@ class CooperativeCoevolutionaryAlgorithm:
                     n_layers=1,
                 ).to(self.device)
 
-            case "CNN":
+            case PolicyEnum.CNN:
                 agent_nn = CNN_Policy(
                     img_size=self.image_size,
                 ).to(self.device)
 
-            case "MLP":
+            case PolicyEnum.MLP:
                 agent_nn = MLP_Policy(
                     input_size=self.observation_size,
                     hidden_layers=len(self.policy_hidden_layers),
@@ -279,7 +287,7 @@ class CooperativeCoevolutionaryAlgorithm:
                         dim=0,
                     )
 
-            observations, rewards, dones, info = env.step(actions)
+            observations, rewards, _, _ = env.step(actions)
 
             # Store joint states per environment
             agent_positions = torch.stack(
@@ -320,13 +328,13 @@ class CooperativeCoevolutionaryAlgorithm:
         # Compute team fitness
         match (self.fitness_calculation):
 
-            case "aggregate":
+            case FitnessCalculationEnum.AGG:
                 g_per_env = torch.sum(torch.stack(G_list), dim=0).tolist()
                 d_per_env = torch.transpose(
                     torch.sum(torch.stack(D_list), dim=0), dim0=0, dim1=1
                 ).tolist()
 
-            case "last_step":
+            case FitnessCalculationEnum.LAST:
                 g_per_env = G_list[-1].tolist()
                 d_per_env = torch.transpose(D_list[-1], dim0=0, dim1=1).tolist()
 
@@ -371,15 +379,15 @@ class CooperativeCoevolutionaryAlgorithm:
     def selectSubPopulation(self, subpopulation):
 
         match (self.selection_method):
-            case "binary":
+            case SelectionEnum.BINARY:
                 chosen_ones = binarySelection(subpopulation, tournsize=2)
-            case "epsilon":
+            case SelectionEnum.EPSILON:
                 chosen_ones = epsilonGreedySelection(
                     subpopulation, self.subpop_size // 2, epsilon=0.3
                 )
-            case "softmax":
+            case SelectionEnum.SOFTMAX:
                 chosen_ones = softmaxSelection(subpopulation, self.subpop_size // 2)
-            case "tournament":
+            case SelectionEnum.TOURNAMENT:
                 chosen_ones = tools.selTournament(
                     subpopulation, self.subpop_size // 2, 2
                 )
@@ -428,7 +436,7 @@ class CooperativeCoevolutionaryAlgorithm:
     ):
 
         match (self.fitness_shaping_method):
-            case "fitness_critics":
+            case FitnessShapingEnum.FC:
                 for eval_info in eval_infos:
                     for idx, individual in zip(
                         eval_info.team.combination, eval_info.team.individuals
@@ -437,12 +445,12 @@ class CooperativeCoevolutionaryAlgorithm:
                             eval_info.joint_traj.observations[idx, :, :]
                         )
 
-            case "global":
+            case FitnessShapingEnum.G:
                 for eval_info in eval_infos:
                     for individual in eval_info.team.individuals:
                         individual.fitness = eval_info.team_fitness
 
-            case "hof_difference":
+            case FitnessShapingEnum.HOF:
 
                 env = create_env(
                     self.batch_dir,
@@ -481,7 +489,7 @@ class CooperativeCoevolutionaryAlgorithm:
                         + self.alpha * d_hof,
                     )
 
-            case "difference":
+            case FitnessShapingEnum.D:
                 for eval_info in eval_infos:
                     for individual, combo_idx in zip(
                         eval_info.team.individuals,
@@ -514,11 +522,11 @@ class CooperativeCoevolutionaryAlgorithm:
         loss_fn = 0
 
         match self.fc_loss_type:
-            case "MSE":
+            case FitnessErrorEnum.MSE:
                 loss_fn = 0
-            case "MAE":
+            case FitnessErrorEnum.MAE:
                 loss_fn = 1
-            case "MSE+MAE":
+            case FitnessErrorEnum.MSE_MAE:
                 loss_fn = 2
 
         fc = [

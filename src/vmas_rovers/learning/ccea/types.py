@@ -40,17 +40,27 @@ class InitializationEnum(StrEnum):
 class PolicyEnum(StrEnum):
     GRU = "GRU"
     MLP = "MLP"
+    CNN = "CNN"
 
 
 class FitnessShapingEnum(StrEnum):
     D = "difference"
     G = "global"
     HOF = "hof_difference"
+    FC = "fitness_critics"
+
+
+class FitnessErrorEnum(StrEnum):
+    MSE = "MSE"
+    MAE = "MAE"
+    MSE_MAE = "MSE+MAE"
 
 
 class SelectionEnum(StrEnum):
     SOFTMAX = "softmax"
     EPSILON = "epsilon"
+    BINARY = "binary"
+    TOURNAMENT = "tournament"
 
 
 class FitnessCalculationEnum(StrEnum):
