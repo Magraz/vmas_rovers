@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from vmas_rovers.learning.ccea.dataclasses import (
     ExperimentConfig,
     PolicyConfig,
@@ -13,7 +15,7 @@ from vmas_rovers.learning.ccea.types import (
 
 from dataclasses import asdict
 
-BATCH = "static_spread"
+BATCH = Path(__file__).stem
 EXPERIMENTS = ["d_gru", "d_mlp", "g_gru", "g_mlp"]
 
 # DEFAULTS
