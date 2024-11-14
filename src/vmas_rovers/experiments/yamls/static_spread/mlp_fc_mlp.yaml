@@ -1,39 +1,35 @@
-use_order: False
-use_teaming: False
-use_fc: True
-
-teaming:
-  team_size: 0
-
-fitness_critic:
-    epochs: 10
-    type: MLP
-    loss_type: MSE+MAE
-    hidden_layers: [80,80]
-
-policy:
-    weight_initialization: kaiming
-    type: MLP
-    hidden_layers: [23,23]
-    output_multiplier: 1.0
-
-ccea:
-
-  fitness_shaping: fitness_critics
-
-  selection: softmax
-
-  subpopulation_size: 100
-
-  fitness_calculation: last_step
-
+ccea_config:
+  fitness_calculation: !!python/object/apply:vmas_rovers.learning.ccea.types.FitnessCalculationEnum
+  - last_step
+  fitness_shaping: !!python/object/apply:vmas_rovers.learning.ccea.types.FitnessShapingEnum
+  - fitness_critics
   mutation:
+    max_std_deviation: 0.25
     mean: 0.0
     min_std_deviation: 0.05
-    max_std_deviation: 0.25
-
-  n_steps: 80
   n_gens: 5000
-
-data:
-  n_gens_between_save: 20
+  n_steps: 80
+  selection: !!python/object/apply:vmas_rovers.learning.ccea.types.SelectionEnum
+  - softmax
+  subpopulation_size: 100
+fc_config:
+  epochs: 20
+  hidden_layers:
+  - 80
+  - 80
+  loss_type: !!python/object/apply:vmas_rovers.learning.ccea.types.FitnessCriticError
+  - MSE+MAE
+  type: !!python/object/apply:vmas_rovers.learning.ccea.types.FitnessCriticType
+  - MLP
+n_gens_between_save: 20
+policy_config:
+  hidden_layers:
+  - 23
+  - 23
+  output_multiplier: 1.0
+  type: !!python/object/apply:vmas_rovers.learning.ccea.types.PolicyEnum
+  - MLP
+  weight_initialization: !!python/object/apply:vmas_rovers.learning.ccea.types.InitializationEnum
+  - kaiming
+use_fc: true
+use_teaming: false

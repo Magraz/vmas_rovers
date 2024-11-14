@@ -50,10 +50,16 @@ class FitnessShapingEnum(StrEnum):
     FC = "fitness_critics"
 
 
-class FitnessErrorEnum(StrEnum):
+class FitnessCriticError(StrEnum):
     MSE = "MSE"
     MAE = "MAE"
     MSE_MAE = "MSE+MAE"
+
+
+class FitnessCriticType(StrEnum):
+    MLP = "MLP"
+    GRU = "GRU"
+    ATT = "ATT"
 
 
 class SelectionEnum(StrEnum):

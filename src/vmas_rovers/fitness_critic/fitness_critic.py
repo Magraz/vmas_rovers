@@ -4,10 +4,11 @@ from random import sample
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from fitness_critic.models.mlp import MLP_Model
-from fitness_critic.models.attention import Attention_Model
-from fitness_critic.models.gru import GRU_Model
-from utils.loss_functions import alignment_loss
+from vmas_rovers.fitness_critic.models.mlp import MLP_Model
+from vmas_rovers.fitness_critic.models.attention import Attention_Model
+from vmas_rovers.fitness_critic.models.gru import GRU_Model
+from vmas_rovers.learning.ccea.types import FitnessCriticType
+from vmas_rovers.utils.loss_functions import alignment_loss
 
 
 class TrajectoryRewardDataset(Dataset):
@@ -25,12 +26,12 @@ class TrajectoryRewardDataset(Dataset):
 
             match model_type:
 
-                case "MLP":
+                case FitnessCriticType.MLP:
                     for s in traj:  # train whole trajectory
                         self.observations.append(s.tolist())
                         self.reward.append([g])
 
-                case "ATTENTION" | "GRU":
+                case FitnessCriticType.ATT | FitnessCriticType.GRU:
                     self.observations.append(traj.tolist())
                     self.reward.append([g])
 
@@ -64,6 +65,8 @@ class FitnessCritic:
         self.device = device
 
         self.model_type = model_type
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
 
         # Set loss function
         if loss_fn == 0:
@@ -77,18 +80,26 @@ class FitnessCritic:
 
         # Set model type
         match self.model_type:
-            case "MLP":
-                self.model = MLP_Model(loss_func=self.loss_func).to(device)
+            case FitnessCriticType.MLP:
+                self.model = MLP_Model(
+                    loss_func=self.loss_func,
+                    hid_dim=self.hidden_size,
+                    n_layers=self.n_layers,
+                ).to(device)
                 self.batch_size = episode_size + 1
 
-            case "ATTENTION":
+            case FitnessCriticType.ATT:
                 self.model = Attention_Model(
                     loss_func=self.loss_func, device=device, seq_len=episode_size + 1
                 )
                 self.batch_size = 1
 
-            case "GRU":
-                self.model = GRU_Model(loss_func=self.loss_func).to(device)
+            case FitnessCriticType.GRU:
+                self.model = GRU_Model(
+                    loss_func=self.loss_func,
+                    hid_dim=self.hidden_size,
+                    n_layers=self.n_layers,
+                ).to(device)
                 self.batch_size = 1
 
         self.params = self.model.get_params()

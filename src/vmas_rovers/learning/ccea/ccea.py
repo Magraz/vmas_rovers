@@ -26,7 +26,7 @@ from learning.ccea.types import (
     SelectionEnum,
     FitnessShapingEnum,
     InitializationEnum,
-    FitnessErrorEnum,
+    FitnessCriticError,
     FitnessCalculationEnum,
 )
 
@@ -67,6 +67,7 @@ class CooperativeCoevolutionaryAlgorithm:
     ):
         policy_config = PolicyConfig(**policy_config)
         ccea_config = CCEAConfig(**ccea_config)
+        fc_config = FitnessCriticConfig(**fc_config)
 
         self.batch_dir = batch_dir
         self.trials_dir = trials_dir
@@ -522,11 +523,11 @@ class CooperativeCoevolutionaryAlgorithm:
         loss_fn = 0
 
         match self.fc_loss_type:
-            case FitnessErrorEnum.MSE:
+            case FitnessCriticError.MSE:
                 loss_fn = 0
-            case FitnessErrorEnum.MAE:
+            case FitnessCriticError.MAE:
                 loss_fn = 1
-            case FitnessErrorEnum.MSE_MAE:
+            case FitnessCriticError.MSE_MAE:
                 loss_fn = 2
 
         fc = [
@@ -535,7 +536,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 model_type=self.fc_type,
                 loss_fn=loss_fn,
                 episode_size=self.n_steps,
-                hidden_size=self.fc_n_hidden,
+                hidden_size=self.fc_n_hidden[0],
                 n_layers=len(self.fc_n_hidden),
             )
             for _ in range(self.n_agents)
