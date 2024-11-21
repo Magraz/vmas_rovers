@@ -17,7 +17,7 @@ from vmas.simulator.utils import ScenarioUtils
 if typing.TYPE_CHECKING:
     from vmas.simulator.rendering import Geom
 
-from domain.custom_sensors import SectorDensity
+from vmas_rovers.domain.sensors import SectorDensity
 from domain.utils import COLOR_MAP
 
 

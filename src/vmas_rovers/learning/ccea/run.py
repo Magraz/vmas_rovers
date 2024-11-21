@@ -2,8 +2,8 @@ import os
 import yaml
 import torch
 from pathlib import Path
-from vmas_rovers.learning.ccea.ccea import CooperativeCoevolutionaryAlgorithm
-from vmas_rovers.learning.ccea.dataclasses import ExperimentConfig, EnvironmentConfig
+from learning.ccea.ccea import CooperativeCoevolutionaryAlgorithm
+from learning.dataclasses import ExperimentConfig, EnvironmentConfig
 from dataclasses import asdict
 
 
@@ -36,8 +36,8 @@ def runCCEA(batch_dir: str, batch_name: str, experiment_name: str, trial_id: int
         map_size=env_config.map_size,
         observation_size=env_config.obs_space_dim,
         action_size=env_config.action_space_dim,
-        n_agents=len(env_config.rovers),
-        n_pois=len(env_config.pois),
+        n_agents=len(env_config.agents),
+        n_pois=len(env_config.targets),
         # Experiment Data
         **asdict(exp_config),
     )

@@ -3,7 +3,7 @@ use_order: True
 obs_space_dim: 8
 action_space_dim: 2
 
-rovers:
+agents:
   - observation_radius: 1
     type: 0
     color: "RED"
@@ -18,7 +18,7 @@ rovers:
       spawn_rule: fixed
       coordinates: [0.0, 0.0]
 
-pois:
+targets:
   - value: 2.0
     coupling: 1
     observation_radius: 0.15

@@ -4,7 +4,7 @@ use_order: False
 obs_space_dim: 8
 action_space_dim: 2
 
-rovers:
+agents:
   - observation_radius: 1
     type: 0
     position:
@@ -41,7 +41,7 @@ rovers:
       spawn_rule: fixed
       coordinates: [0.0, 0.0]
 
-pois:
+targets:
   - value: 1.0
     coupling: 2
     observation_radius: 0.25

@@ -8,9 +8,9 @@ import random
 from vmas.simulator.environment import Environment
 from vmas.simulator.utils import save_video
 
-from policies.mlp import MLP_Policy
-from policies.gru import GRU_Policy
-from policies.cnn import CNN_Policy
+from learning.ccea.policies.mlp import MLP_Policy
+from learning.ccea.policies.gru import GRU_Policy
+from learning.ccea.policies.cnn import CNN_Policy
 
 from fitness_critic.fitness_critic import FitnessCritic
 from domain.create_env import create_env
@@ -19,15 +19,24 @@ from learning.ccea.selection import (
     epsilonGreedySelection,
     softmaxSelection,
 )
-from learning.ccea.types import JointTrajectory, Team, EvalInfo
-from learning.ccea.dataclasses import CCEAConfig, PolicyConfig, FitnessCriticConfig
 from learning.ccea.types import (
+    EvalInfo,
     PolicyEnum,
     SelectionEnum,
     FitnessShapingEnum,
-    InitializationEnum,
     FitnessCriticError,
+    InitializationEnum,
     FitnessCalculationEnum,
+)
+from learning.dataclasses import (
+    CCEAConfig,
+    PolicyConfig,
+    FitnessCriticConfig,
+)
+
+from learning.types import (
+    Team,
+    JointTrajectory,
 )
 
 from copy import deepcopy
